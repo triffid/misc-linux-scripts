@@ -1,0 +1,3 @@
+#!/bin/sh
+TITLE="$@"
+/bin/echo -en "\033]2;${TITLE}\007\e[0G\033k${TITLE}\033\\ \e[0G";

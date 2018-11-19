@@ -1,0 +1,25 @@
+#!/bin/bash
+
+SEARCH_CACHE=/var/lib/portage/searchdesc
+
+while [ -n "$1" ]
+do
+	if [ -r $SEARCH_CACHE ] && [ $(wc -l < $SEARCH_CACHE) -ge 11000 ]
+	then
+		perl -ne "m#^\\S*$1# && print" $SEARCH_CACHE	| \
+			cgrep "\/$1\\s" green								| \
+			cgrep "^\\S*\\b$1\\b" brown							|| \
+				echo "$1 not found"
+	else
+		for P in /usr/portage/*-*/$1
+		do
+			if [ -d $P ]; then
+				. $P/*.ebuild 2>/dev/null
+				echo -e "${P##/usr/portage/}\t$DESCRIPTION"
+			else
+				echo "$1 not found"
+			fi
+		done
+	fi
+	shift
+done

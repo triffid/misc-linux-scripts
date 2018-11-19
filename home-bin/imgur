@@ -1,0 +1,76 @@
+#!/bin/sh
+
+if [ ! -f "$HOME/.imgur" ]
+then
+	touch ~/.imgur
+	chmod 0600 ~/.imgur
+	cat <<ENDSAMPLE > ~/.imgur
+# get these from https://api.imgur.com/oauth2/addclient
+
+CLIENTID="YOUR_CLIENTID"
+CLIENTSECRET="YOUR_CLIENTSECRET"
+
+# do an oauth login to get this - https://api.imgur.com/oauth2/authorize?client_id=${CLIENTID}&response_type=token
+
+REFRESH_TOKEN="YOUR_REFRESHTOKEN"
+ENDSAMPLE
+	echo "Please fill the information in ~/.imgur from your Imgur API account"
+	exit 1
+fi
+
+source ~/.imgur
+
+# and now we begin
+# =================================
+
+echo -n "Auth: "
+
+AUTHKEY=$(curl -s -F 'refresh_token='$REFRESH_TOKEN -F 'client_id='$CLIENTID -F 'client_secret='$CLIENTSECRET -F 'grant_type=refresh_token' 'https://api.imgur.com/oauth2/token' |\
+	perl -MJSON::PP -MData::Dumper -ne 'my %pairs = %{decode_json($_)}; print $pairs{access_token}; print stderr "Logged in as $pairs{account_username} " if $pairs{account_username}; die "Error: $pairs{error}" if $pairs{error};' )
+
+# perl -MData::Dumper -ne 's/^{//; s/}$//; my %pairs; for my $pair (split /,/) { $pair =~ /"(.*?)":"(.*?)"$/ && do { $pairs{$1} = $2; }; }; END { print $pairs{access_token}; print stderr "Logged in as " . $pairs{username} }')
+
+if [ -z "$AUTHKEY" ]
+then
+	echo "Failed. Generate a new refresh token by visiting https://api.imgur.com/oauth2/authorize?client_id=$CLIENTID&response_type=token and putting it in ~/.imgur"
+	exit 1
+fi
+
+echo "OK"
+
+if [ "$1" == "-album" ]
+then
+	shift
+	if [ -n "$1" ]
+	then
+		ALBUM="$1"
+		echo  Using Album $ALBUM
+		shift
+	else
+		echo "Listing Albums:"
+		curl -s -H 'Authorization: Bearer '$AUTHKEY https://api.imgur.com/3/account/me/albums |\
+			perl -MJSON::PP -MData::Dumper -e 'local undef $/; my %a = %{decode_json(<>)}; for my $album (@{$a{data}}) { printf "%6s: %s (%s)\n", $album->{id}, $album->{title}, scalar(localtime($album->{datetime})) }'
+		echo
+		exit 0
+	fi
+fi
+
+if [ -n "$ALBUM" ]
+then
+	ALBUMARGS="-F album=$ALBUM"
+fi
+
+while [ -s "$1" ]
+do
+	echo Posting "$1"
+	until ( curl -\# -H 'Authorization: Bearer '$AUTHKEY -F 'image=@'"$1" $ALBUMARGS https://api.imgur.com/3/upload |\
+		perl -MJSON::PP -MData::Dumper -ne 'my %a = %{decode_json($_)} or die "$!"; die "Empty response, upload failed" unless keys %a; if ($a{data}->{error}) { die "Error: %s\n", $a{data}->{error}; } my $fn = $a{data}->{link}; $fn =~ s!.*/!!; printf "echo \"Success! %s %dx%d, id %s, link %s\"\nln -s \"'$1'\" \"imgur-%s\"", (("'$ALBUM'")?"[Album: '$ALBUM']":""), $a{data}->{width}, $a{data}->{height}, $a{data}->{id}, $a{data}->{link}, $fn;' | bash; exit ${PIPESTATUS[0]}; )
+	do
+		sleep 1
+		echo "[Retry] $1"
+	done
+
+	shift
+done
+
+echo

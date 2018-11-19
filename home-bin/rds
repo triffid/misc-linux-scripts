@@ -1,0 +1,58 @@
+#!/usr/bin/python3
+
+import sys
+from pprint import pprint, pformat
+import argparse
+from operator import itemgetter
+
+eseries = {
+	 6: [100, 150, 220, 330, 470, 680],
+	12: [100, 120, 150, 180, 220, 270, 330, 390, 470, 560, 680, 820],
+	24: [100, 110, 120, 130, 150, 160, 180, 200, 220, 240, 270, 300, 330, 360, 390, 430, 470, 510, 560, 620, 680, 750, 820, 910],
+	48: [100, 105, 110, 115, 121, 127, 133, 140, 147, 154, 162, 169, 178, 187, 196, 205, 215, 226, 237, 249, 261, 274, 287, 301, 316, 332, 248, 365, 383, 402, 422, 442, 464, 487, 511, 536, 562, 590, 619, 649, 681, 715, 750, 787, 825, 866, 909, 953],
+}
+
+parser = argparse.ArgumentParser(description='Resistor Divider Search')
+
+parser.add_argument('Vin', metavar='Vin', type=float, help='Input voltage')
+parser.add_argument('Vout', metavar='Vout', type=float, help='Output voltage')
+
+parser.add_argument('-e', '--series', help='E-series to use', type=int, choices=[6,12,24,48], default=12)
+parser.add_argument('-r', '--results', help='Results to show', type=int, default=1)
+
+args = parser.parse_args()
+
+#pprint(args.Vin)
+#pprint(args.Vout)
+#pprint(eseries[args.series])
+
+vin  = args.Vin
+vout = args.Vout
+es   = eseries[args.series]
+rat  = vout / vin
+
+def getvo(r1, r2):
+	return r2 / (r1 + r2)
+
+best = []
+
+for r1 in es:
+	for r2 in es:
+		best.append([r1, r2, abs((getvo(r1, r2) * vin) - vout)])
+for r1 in es:
+	for r2 in es:
+		best.append([r1 * 10, r2, abs((getvo(r1 * 10, r2) * vin) - vout)])
+
+best.sort(key=itemgetter(2))
+
+print()
+print("Best results:")
+for i in range(args.results):
+	r1 = best[i][0]
+	r2 = best[i][1]
+	rat = getvo(r1, r2)
+	vo = rat * vin
+	erro = (vo - vout) * 100 / vout
+	vi = vout / rat
+	erri = (vi - vin) * 100 / vin
+	print("\tR1 %d R2 %d Vin %gv ->\tVout %gv (%gv %+4.1g%%)\tor Vout %gv -> Vin %gv (%gv %+g%%)"%(r1, r2, vin, vo, vout, erro, vout, vout / rat, vin, erri))

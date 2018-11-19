@@ -1,0 +1,8 @@
+#!/bin/sh
+while [ -n "$1" ]; do
+	while [ -n "$(pidof -x $1)" ]; do
+		sleep 5
+	done
+	echo $1 finished.
+	shift
+done

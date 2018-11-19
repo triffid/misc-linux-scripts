@@ -1,0 +1,30 @@
+#!/usr/bin/perl
+
+use strict;
+
+my @lines;
+my $sum = 0;
+
+while (<>) {
+	chomp;
+	my $line = $_;
+	if (/^(\d+)\s/) {
+		$sum += $1;
+		push @lines, $line;
+	}
+}
+
+my $rand = int(rand($sum));
+
+foreach (@lines) {
+	my $line = $_;
+	if (/^(\d+)\s/) {
+		$rand -= $1;
+		if ($rand <= 0) {
+			print "$line\n";
+			exit 0;
+		}
+	}
+}
+
+printf "%s\n", $lines[int(rand(scalar @lines))];

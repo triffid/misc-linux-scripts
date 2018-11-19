@@ -1,0 +1,29 @@
+#!/usr/bin/perl
+
+use strict;
+use File::Basename;
+
+my %c;
+
+for (0..7) {
+	$c{"3$_"} = ["\033[3".$_."m", "\033[m"];
+	$c{[qw/black red green brown blue magenta cyan white/]->[$_]} = ["\033[3".$_."m", "\033[m"];
+}
+
+if ($ARGV[0] !~ /./ || !exists $c{$ARGV[1]}) {
+	printf("USAGE: %s <searchterm> <%s>\n", basename($0), join('|',sort keys %c));
+	exit 1;
+}
+
+my $searchterm = shift;
+my $colour = shift;
+
+$| = 1;
+
+while (<>) {
+	/$searchterm/i && do {
+		chomp;
+		$_ = join "", $c{$colour}->[0], $_, $c{$colour}->[1], "\n";
+	};
+	print;
+}

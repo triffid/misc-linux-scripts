@@ -1,0 +1,41 @@
+modules="iproute2"
+
+dhcp="nodns nontp noarp"
+
+postup() {
+	logger -t netifrc postup $IFACE
+
+	# ensure interface has a matching routing table
+	if ! grep -Pq '^\s*\d+\s+'$IFACE'\b' /etc/iproute2/rt_tables
+	then
+		NEWNUM=$( ( for I in {0..255}; do egrep -q ^$I'\b' /etc/iproute2/rt_tables || echo $I; done; ) | head -n1 )
+		printf "%-3d     %s\n" $NEWNUM $IFACE >> /etc/iproute2/rt_tables
+	fi
+
+	# ensure connections made on this interface stay on it
+	IPADDR=$(ip addr show dev $IFACE | perl -ne '/^\s*inet\s+([\d\.]+)/ && print "$1\n";')
+	ip rule add from $IPADDR lookup $IFACE table $IFACE
+	ip route show dev $IFACE | sed 's/^/ip route add table '$IFACE' dev '$IFACE' /' | /bin/sh
+
+	# start dnsmasq on NAT interface
+	[ "$IFACE" == "enp0s31f6" ] && /etc/init.d/dnsmasq start
+
+	# list routes for ethernet and wifi as non-vpn
+	[ "$IFACE" == "wlp4s0"    ] && ip route show dev $IFACE | sed 's/^/ip route add table china dev '$IFACE' /' | /bin/sh
+	[ "$IFACE" == "enp3s0"    ] && ip route show dev $IFACE | sed 's/^/ip route add table china dev '$IFACE' /' | /bin/sh
+
+	true
+}
+
+predown() {
+	logger -t netifrc predown $IFACE
+
+	ip rule show table $IFACE | sed 's/.*:/ip rule del table 'IFACE' /'
+	ip route show table $IFACE | sed 's/^/ip route del table '$IFACE' /' | /bin/sh
+
+	# remove routes from non-vpn routing table
+	[ "$IFACE" == "wlp4s0"    ] && ip route show table china dev $IFACE | sed 's/^/ip route del table china dev '$IFACE' /' | /bin/sh
+	[ "$IFACE" == "enp3s0"    ] && ip route show table china dev $IFACE | sed 's/^/ip route del table china dev '$IFACE' /' | /bin/sh
+
+	true
+}

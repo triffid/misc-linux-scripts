@@ -1,0 +1,9 @@
+#!/bin/bash
+
+DATETIME=$(date +%Y%m%d-%H%M%S)
+DATE=$(echo $DATETIME | cut -d- -f1)
+
+mkdir -p ~/Screenshots/$DATE && ln -nfs ~/Screenshots/$DATE ~/Screenshots/latest
+import -window root ~/Screenshots/$DATE/screenshot-$DATETIME.png
+
+mpv /usr/share/sounds/pop.wav

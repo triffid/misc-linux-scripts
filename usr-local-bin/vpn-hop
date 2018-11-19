@@ -1,0 +1,23 @@
+#!/bin/bash
+
+CUMULATIVELOG="/var/lib/l2tp/cumulative-success.log"
+
+mkdir -p "$(dirname "$CUMULATIVELOG")"
+
+if [ $((RANDOM % 2 )) -eq 0 ] || [ $( wc -l "$CUMULATIVELOG" | cut -d\  -f1 ) -le 2 ]
+then
+	HOSTINFO=$(grep local-data /etc/unbound/unbound.pia | cut -d\" -f2 | sort -R | head -n1)
+	HOST=$(cut -d\  -f1 <<< "$HOSTINFO")
+	IP=$(cut -d\  -f4 <<< "$HOSTINFO")
+
+	echo "Using $HOST ($IP)"
+else
+	HOSTINFO="$(weighted-random-line "$CUMULATIVELOG")"
+	HOST=$(cut -d\  -f2 <<< "$HOSTINFO")
+	IP=$(cut -d\  -f3 <<< "$HOSTINFO")
+	TIME=$(cut -d\  -f1 <<< "$HOSTINFO")
+
+	echo "Using $HOST ($IP) which has accumulated $TIME minutes"
+fi
+
+cat /etc/xl2tpd/xl2tpd.conf.template | sed -e 's/^lns =.*/lns = '$IP'/' > /etc/xl2tpd/xl2tpd.conf.new && mv /etc/xl2tpd/xl2tpd.conf.new /etc/xl2tpd/xl2tpd.conf && /etc/init.d/xl2tpd restart &>/dev/null

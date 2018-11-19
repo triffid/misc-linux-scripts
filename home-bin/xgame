@@ -1,0 +1,35 @@
+#!/bin/sh
+
+SELF=${0##*/}
+DIR="$(realpath "$0")"
+
+#echo $DIR
+#echo $SELF
+
+#exit 0
+
+if [ "$DISPLAY" == ":1" ]
+then
+	CWD="$1"
+	shift;
+	APP="$1"
+	shift;
+
+	xinput --disable 'DualPoint Stick'
+	setxkbmap -layout us -option ""
+	setxkbmap -option "terminate:ctrl_alt_bksp"
+	setsid openbox &>/dev/null </dev/null &
+	xset r off
+	xbindkeys -n -v &
+
+	cd "$CWD"
+	echo "In dir $PWD"
+
+	#exec glc-capture -o ~/abyss-Private/%app%-%pid%-%capture%-%year%%month%%day%-%hour%%min%%sec%.glc -g -b back -i "${APP:lxterminal}" "$@"
+	exec "${APP:lxterminal}" "$@"
+
+	exit 1
+else
+	sleep 0.1
+	setsid xinit "$(realpath $0)" "$PWD" "$@" -- :1
+fi

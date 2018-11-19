@@ -1,0 +1,9 @@
+#!/bin/bash
+
+pia-to-unbound.py > /etc/unbound/unbound.pia.new
+
+if [ $(wc -l /etc/unbound/unbound.pia.new | cut -d\  -f1) -ge 200 ]
+then
+	mv /etc/unbound/unbound.pia.new /etc/unbound/unbound.pia
+	/etc/init.d/unbound reload &>/dev/null
+fi

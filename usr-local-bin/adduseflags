@@ -1,0 +1,138 @@
+#!/usr/bin/perl
+
+use strict;
+
+my	(	$useFlagPlaceholder,
+		$useDescAdded,
+		$useDescRemoved
+	)=(	"#__USE_FLAG_PLACEHOLDER___",
+		"# USE FLAGS - SELECTED (modified by adduseflags)",
+		"# USE FLAGS - DESELECTED (modified by adduseflags)",
+	);
+
+my $E = "\033";
+
+if (@ARGV) {
+		my @makeLines = ();
+		my %useFlags = ();
+		my $makeconf = ($ARGV[0] =~ m:/:)?0:1;
+		my $package;
+			$package = shift unless $makeconf;
+		my $editfile = $makeconf?"/etc/portage/make.conf":"/etc/portage/package.use/$package";
+		open USEFLAGFILE, "< $editfile"
+				or die "cannot open $editfile: $!";
+		while (<USEFLAGFILE>) {
+				chomp;
+				next if $_ eq $useDescAdded;
+				next if $_ eq $useDescRemoved;
+
+				if (	($makeconf && /^\s*USE\s*=\s*"(?:\$\{USE\}\s+)?([\s\+\-a-z\_\d]+)/i)
+					||	(!$makeconf && m:^\Q$package\E\s*([\-\s\da-z]+):)
+				) {
+						my @flagList = split /\s+/, $1;
+						print scalar(@flagList)." flags in $editfile line $.\n";
+						for my $flag (@flagList) {
+								$flag =~ /^([\-]?)([a-z\d][a-z\d\-\_]*)$/i && do {
+										print "duplicate flag in source file: $2\n"
+												if exists $useFlags{$2};
+										$useFlags{$2} = ($1 eq '-')?0:1;
+										next;
+								};
+								print stderr "IMPROPER USE FLAG: $flag\n";
+						}
+				}
+				else {
+						push @makeLines, $_;
+				}
+		}
+		close USEFLAGFILE;
+
+		for (@ARGV) {
+				/^([\+\-\_]?)([a-z\d][a-z\d\-\_]*)$/i && do {
+						my ($todo,$flag) = ($1,$2);
+						$useFlags{$flag} = 1 if $todo eq '+' || $todo eq '';
+						$useFlags{$flag} = 0 if $todo eq '-';
+						delete $useFlags{$flag} if $todo eq '_' && exists $useFlags{$flag};
+						next;
+				};
+				print "UNRECOGNISED COMMAND LINE OPTION: $_\n";
+		}
+
+		my (@added,@removed);
+		for (keys %useFlags) {
+				$useFlags{$_} && do { push @added, $_; 1 } ||
+						do { push @removed, $_; };
+		}
+
+
+		print scalar(keys %useFlags)." use flags in new set\n";
+
+		(unlink "$editfile~"
+				or die "cannot remove old backup of $editfile: $!")
+				if -e "$editfile~";
+
+		(rename "$editfile", "$editfile~"
+				or die "couldn't back up $editfile: $!")
+				if -e "$editfile";
+
+		open MAKEFILE, "> $editfile"
+				or die "couldn't open $editfile for writing: $!";
+
+		for (@makeLines) {
+			print MAKEFILE $_,"\n"
+				if $_ ne $useFlagPlaceholder;
+		}
+		if ($makeconf) {
+			if (scalar @added) {
+				print MAKEFILE $useDescAdded,"\n";
+				print MAKEFILE 'USE="'.join(' ',sort {lc($a) cmp lc($b)} @added)."\"\n";
+			}
+			if (scalar @removed) {
+				print MAKEFILE $useDescRemoved,"\n";
+				print MAKEFILE 'USE="${USE} -'.join(' -',sort {lc($a) cmp lc($b)} @removed)."\"\n";
+			}
+		}
+		else {
+			print MAKEFILE "$package\t".join(' ',sort {lc($a) cmp lc($b)} @added).(@removed?' -'.join(' -',sort {lc($a) cmp lc($b)} @removed):'')."\n"
+				if scalar @added || scalar @removed;
+		}
+		close MAKEFILE;
+}
+else {
+		print <<ENDHELP;
+USAGE: adduseflags [category/package] <flags>
+
+category/package:
+       an optional package atom. Modifies /etc/portage/package.use instead
+       of /etc/make.conf, applying the use flags to that package. You MUST
+       specify the category, as there is no easy way to tell a package name
+       from a use flag.
+       
+       Example:
+           adduseflags sys-kernel/gentoo-sources doc -symlink _build
+
+       which would change the line in /etc/portage/package.use for
+       gentoo-sources (or add it if there isn't one yet) to read:
+           sys-kernel/gentoo-sources doc -symlink
+       regardless of whether the doc, symlink and build flags were on, off,
+       or even present.
+       If all use flags are removed from a package with _, the package will
+       be removed from package.use completely.
+
+flags: one or more use flags, separated by spaces, optionally prepended with a
+	   "-", "+" or "_"
+	   if a use flag isn't in the list, it will be added, be it +flag or -flag.
+	   if a use flag is in the list, and its state isn't changed, no change
+		 happens.
+	   if a use flag is in the list, and its state is changed (either from
+		 +flag to -flag or vice versa), the original flag is replaced by the
+		 new one
+
+this should make the use intuitive, whereby adduseflag option will "set" a
+flag, and adduseflags -flag will "unset" it.
+
+to remove a flag from the list altogether, restoring its effective state to
+default, prepend it with a "_", as in adduseflags _ipv6
+ENDHELP
+}
+

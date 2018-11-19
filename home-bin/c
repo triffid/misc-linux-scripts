@@ -1,0 +1,46 @@
+#!/bin/sh
+
+TEMP=$(mktemp --suffix=.c)
+
+cat <<'ENDHEAD' > "$TEMP"
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits.h>
+#include <unistd.h>
+#include <math.h>
+#include <arpa/inet.h>
+#include <iostream>
+#include <string>
+#include <cstring>
+
+int main(int argc, char** argv)
+{
+ENDHEAD
+
+declare -a CFLAGS
+
+CFLAGS="-std=gnu++11 "
+CFLAGS="$(pkg-config --cflags eigen3) "
+CFLAGS=-I"\"$PWD\" "
+
+while [[ "$1" =~ ^- ]] || [[ -f "$1" ]]
+do
+	CFLAGS="$1"
+	shift
+done
+
+if [[ "$#" -gt 0 ]]
+then
+	echo "\t$@" >> "$TEMP"
+else
+	cat >> "$TEMP"
+fi
+
+cat <<'ENDTAIL' >> "$TEMP"
+}
+ENDTAIL
+
+g++ "${CFLAGS[@]}" -o "${TEMP%%.c}" "$TEMP" -lm && "${TEMP%%.c}"
+
+rm -f "$TEMP" "${TEMP%%.c}"

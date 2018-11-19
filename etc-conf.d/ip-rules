@@ -1,0 +1,8 @@
+# /etc/conf.d/ip-rules
+
+# Location in which ip-rules initscript will save set rules on 
+# service shutdown
+IP_RULES_SAVE="/var/lib/ip-rules/rules-save"
+
+# Save state on stopping ip-rules
+SAVE_ON_STOP="yes"

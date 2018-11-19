@@ -1,0 +1,41 @@
+#!/sbin/openrc-run
+# Copyright 1999-2013 Gentoo Foundation
+# Distributed under the terms of the GNU General Public License v2
+
+extra_commands="save restore"
+
+depend() {
+	need localmount #434774
+	before net
+}
+
+restore() {
+	if [ -e "${IP_RULES_SAVE}" ]
+	then
+		ebegin "Loading saved rules"
+		( while read; do ip rule add $REPLY; done; ) < "${IP_RULES_SAVE}"
+		while ip rule show | egrep -v '^(0|32766|32767):' | sed -e 's/.*:\s*//' | sort | uniq -d | grep .
+		do
+			ip rule show | egrep -v '^(0|32766|32767):' | sed -e 's/.*:\s*/ip rule del /' | sort | uniq -d | sh
+		done
+	else
+		ebegin "No saved rules"
+	fi
+	eend $?
+}
+
+save() {
+	ebegin "Saving ip rules"
+	mkdir -p "$(dirname "${IP_RULES_SAVE}")"
+	ip rule show | egrep -v '^(0|32767|32766):' | sed -e 's/^\(.*\):\s*/priority \1 /' > "${IP_RULES_SAVE}"
+	chmod 0600 "${IP_RULES_SAVE}"
+	eend $?
+}
+
+start() {
+	restore
+}
+
+stop() {
+	save
+}

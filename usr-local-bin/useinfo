@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# Copyright (c) Triffid_Hunter, 2005
+# This software is licensed under the GNU GPL
+# available at http://www.gnu.org/copyleft/gpl.html
+
+while [[ -n $1 ]]; do
+	grep -h $1 /usr/portage/profiles/use.*
+	shift
+done

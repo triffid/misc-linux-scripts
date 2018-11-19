@@ -1,0 +1,12 @@
+#!/bin/bash
+
+while [ -e "$1" ]
+do
+	F=$1
+	echo $F
+	#mencoder -audio-demuxer 35 -audiofile <(glc-play "$F" -a 1 -o -) <(glc-play "$F" -y 1 -o -) -oac mp3lame -ovc x264 -o "${F%.*}".avi
+	ffmpeg -i <(glc-play "$F" -y 1 -o -) -i <(glc-play "$F" -a 1 -o -) -c:v mpeg4 -b:v 600k -c:a libvorbis -b:a 96k -y "${F%.*}".mp4
+	shift
+done
+
+# ffmpeg -i <(glc-play KSP.x86-26708-0.glc -t -y 1 -o -) -i <(sox -S <(glc-play KSP.x86-26708-0.glc -t -a 1 -o -) -t mp3 - tempo 8) -map 0:0 -map 1:0 -filter:v "movie=8x_1280x800_watermark.png [w]; [in] setpts=0.125*PTS, [w] overlay=0:0 [out]" -c:v mpeg4 -c:a copy -q:v 5 KSP.x86-26708-0_x8w.avi

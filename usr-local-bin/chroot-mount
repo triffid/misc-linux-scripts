@@ -1,0 +1,73 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]
+then
+	echo USAGE: $0 /chroot/dir [program]
+	exit
+fi
+
+CHROOT=$(realpath "$1")
+PROG=${2:-/bin/bash}
+
+if [ ! -d "$CHROOT" ]
+then
+	echo "Cannot find realpath for $1!"
+	exit 1
+fi
+
+if ! mount | grep -q "$CHROOT"
+then
+	echo -n "Mounting $CHROOT/*..."
+
+	mount -t proc proc		"$CHROOT"/proc	|| exit 1
+	mount -t sysfs sysfs	"$CHROOT"/sys	|| exit 1
+
+	mount -o bind /dev		"$CHROOT"/dev	|| exit 1
+	mount -o bind /dev/pts	"$CHROOT"/dev/pts	|| exit 1
+	mount -t tmpfs -o size=1G none "$CHROOT"/dev/shm && chmod 1777 "$CHROOT"/dev/shm || exit 1
+
+	#if [ -d "$CHROOT"/usr/portage ]
+	#then
+	#	mount -o bind /usr/portage	"$CHROOT"/usr/portage	|| exit 1
+	#fi
+
+	#if [ -d "$CHROOT""/usr/portage/distfiles" ]
+	#then
+	#	mount -o bind "$(readlink /usr/portage/distfiles)" "$CHROOT""/usr/portage/distfiles"
+	#fi
+
+	echo " OK"
+fi
+
+
+echo "Chrooting into $CHROOT..."
+HOSTNAME="chroot:$HOSTNAME" chroot "$CHROOT" "$PROG"
+
+if lsof -t "$CHROOT" > /dev/null
+then
+	lsof "$CHROOT"
+else
+	echo -n "Unmounting $CHROOT/*..."
+
+	#if [ -d "$CHROOT""$(readlink /usr/portage/distfiles)" ]
+	#then
+	#	umount "$CHROOT""$(readlink /usr/portage/distfiles)"
+	#fi
+	#if [ -d "$CHROOT"/usr/portage ]
+	#then
+	#	umount "$CHROOT"/usr/portage
+	#fi
+
+	umount "$CHROOT"/dev/shm
+	umount "$CHROOT"/dev/pts
+	umount "$CHROOT"/dev
+
+	umount "$CHROOT"/sys
+	umount "$CHROOT"/proc
+
+	umount "$CHROOT"/*/*/* 2>/dev/null
+	umount "$CHROOT"/*/*   2>/dev/null
+	umount "$CHROOT"/*     2>/dev/null
+
+	echo " OK"
+fi

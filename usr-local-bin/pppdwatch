@@ -1,0 +1,76 @@
+#!/bin/bash
+
+CUMULATIVELOG="/var/lib/l2tp/cumulative-success.log"
+
+LASTHOP=$(date +%s)
+
+mkdir -p "$(dirname "$CUMULATIVELOG")"
+
+while sleep 5
+do
+	if ! ifconfig | grep -q ^ppp
+	then
+		IP=$(grep ^lns /etc/xl2tpd/xl2tpd.conf | head -n1 | cut -d= -f2 | xargs echo)
+		if [ -n "$IP" ]
+		then
+			HOST=$(grep $IP /etc/unbound/unbound.pia | head -n1 | cut -d\" -f2 | cut -d. -f1)
+			if [ -z "$HOST" ]
+			then
+				HOST=$(grep $(cut -d. -f1-3 <<< $IP) /etc/unbound/unbound.pia | head -n1 | cut -d\" -f2 | cut -d. -f1)
+			fi
+			if [ -z "$HOST" ]
+			then
+				HOST=$(grep $IP "$CUMULATIVELOG" | head -n1 | cut -d\  -f2)
+			fi
+			HOST="${HOST:-unknown}"
+			if [ $(( $(date +%s) - $LASTHOP )) -le 45 ]
+			then
+				if grep -q " ${IP}$" $CUMULATIVELOG
+				then
+					echo -n "$HOST ($IP) failed to connect, "
+
+					PREVIOUSTIME=$(grep " ${IP}$" $CUMULATIVELOG  | cut -d\  -f1)
+
+					CUMULATIVETIME=$(( $PREVIOUSTIME - 2))
+
+					grep -v " ${IP}$" "$CUMULATIVELOG" > "$CUMULATIVELOG.new"
+					if [ $CUMULATIVETIME -ge 1 ]
+					then
+						echo "setting new cumulativetime to $CUMULATIVETIME"
+						echo "${CUMULATIVETIME:-0} $HOST $IP" >> "$CUMULATIVELOG.new"
+					else
+						echo "removing from good list"
+					fi
+					sort -gr < "$CUMULATIVELOG.new" > "$CUMULATIVELOG"
+					rm "$CUMULATIVELOG.new"
+				fi
+			elif [ $(( $(date +%s) - $LASTHOP )) -ge 900 ]
+			then
+				CONNECTTIME=$(( $(( $(date +%s) - $LASTHOP )) / 60 ))
+
+				PREVIOUSTIME=0
+				if grep -q " ${IP}$" $CUMULATIVELOG
+				then
+					PREVIOUSTIME=$(grep " ${IP}$" $CUMULATIVELOG  | cut -d\  -f1)
+				fi
+				#echo -n "CUMULATITVETIME=\$(( $CONNECTTIME + $PREVIOUSTIME )) = $(( $CONNECTTIME + $PREVIOUSTIME ))"
+				CUMULATIVETIME=$(( $CONNECTTIME + $PREVIOUSTIME ))
+				#echo " ($CUMULATIVETIME)"
+
+				echo "$HOST ($IP) connected for $CONNECTTIME ($CUMULATIVETIME) minutes"
+				grep -v " ${IP}$" "$CUMULATIVELOG" > "$CUMULATIVELOG.new"
+				echo "$CUMULATIVETIME $HOST $IP" >> "$CUMULATIVELOG.new"
+				sort -gr < "$CUMULATIVELOG.new" > "$CUMULATIVELOG"
+				rm "$CUMULATIVELOG.new"
+			fi
+		fi
+		/etc/init.d/xl2tpd stop &>/dev/null
+		while ifconfig | grep -q ppp
+		do
+			sleep 1
+		done
+		printf "%-30s %s" "$(date)" "$(vpn-hop)"; echo
+		LASTHOP=$(date +%s)
+		sleep 20
+	fi
+done

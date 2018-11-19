@@ -1,0 +1,330 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Data::Dumper;
+
+my $video_id;
+my $hostsite;
+my $urldata;
+my $nicetitle;
+
+my $forcesize;
+my $forceformat;
+my $extension = "flv";
+
+my $play = 1;
+
+my $metadata_file;
+
+while ($ARGV[0] =~ /^\-/ && $ARGV[0] !~ /^--$/) {
+	my ($argument) = shift;
+	for ($argument) {
+		m#^(-s|--size)$# && do {
+			$forcesize = shift;
+			last;
+		};
+		m#^(-f|--format)$# && do {
+			$forceformat = shift;
+			last;
+		};
+		m#^(-d|--download)$# && do {
+			$play = 0;
+			last;
+		};
+		printf stderr "Unrecognised option \"%s\"\n", $argument;
+	}
+}
+
+my $playerpid = 0;
+
+mainloop: while (my $arg = shift @ARGV) {
+	for ($arg)
+	{
+		m#.*youtube\.com/.*?video_id=([a-z0-9_\-]{8,14})\b#i && do { $video_id = $1; $hostsite = 'youtube'; last; };
+		m#.*youtube\.com/.*?v=([a-z0-9_\-]{8,14})\b#i && do { $video_id = $1; $hostsite = 'youtube'; last; };
+		m#.*youtube\.com/v/([a-z0-9_\-]{8,14})\b#i && do { $video_id = $1; $hostsite = 'youtube'; last; };
+		m#.*youtu\.be/([a-z0-9_\-]{8,14})\b#i && do { $video_id = $1; $hostsite = 'youtube'; last; };
+		m#^([a-z0-9_\-]{8,14})$#i && do {$video_id = $1; $hostsite = 'youtube'; last; };
+		m#^youtube:(.*)$#i && do { $hostsite = 'youtube'; $metadata_file = $1; last; };
+
+		m#.*starsclips\.net(/\S+)#i && do { $video_id = $1; $hostsite = 'starsclips'; last; };
+
+		m#.*break.com(/\S*)#i && do { $video_id = $1; $hostsite = 'break.com'; last; };
+
+		m#.*google.com/.*docid=(-?\d{15,24})#i && do { $video_id = $1; $hostsite = 'video.google.com'; last; };
+		m#^(-?\d{15,24})$#i && do { $video_id = $1; $hostsite = 'video.google.com'; last; };
+
+		m#.*vimeo.com/(\d+)#i && do { $video_id = $1; $hostsite = 'vimeo.com'; last; };
+		m#.*vimeo.com/.*clip_id=(\d+)#i && do { $video_id = $1; $hostsite = 'vimeo.com'; last; };
+
+		$hostsite = $arg;
+		# die "Unrecognised url: $arg";
+	}
+
+	my $cookiefile = qx{tempfile -p vidDL -s .cookie};
+	$cookiefile =~ s/\s*$//s;
+
+	for ($hostsite)
+	{
+		m#^youtube$# && do
+		{
+			my $metadata;
+			if ($metadata_file) {
+				local undef $/;
+				printf "Reading metadata from '%s'...", $metadata_file;
+				open M, '<', $metadata_file or die $!;
+				$metadata = <M>;
+				close M;
+				printf " done.\n";
+			}
+			else {
+                my $extra = "";
+                $extra = "&list=$1" if $arg =~ /list=([A-Za-z0-9_\-]{13,})/;
+
+				print "Getting metadata [YouTube Video$extra]...";
+
+				$metadata = qx{wget -q -O - -U -T 10 "Mozilla/5.0" --keep-session-cookies --save-cookies "$cookiefile" "http://www.youtube.com/watch?v=$video_id$extra" | tee .videodownload-metadata}
+					|| die "Couldn't get metadata: $!";
+
+				print " done.\n";
+			}
+
+			my ($title, $new_video_id, $z);
+
+			for ($metadata) {
+				(m!link rel="canonical" href="https?://www.youtube.com/watch\?v=(.{11})!) && do { $new_video_id = $1; $video_id = $new_video_id unless undef $video_id; 1; } or die "no canonical link";
+				while (m!a href="([^"]+)" class="[^"]*playlist-video[^"]*".*?<h4[^>]*>([^<]+)<!sg) {
+                    my ($url, $title) = ($1, $2);
+                    if ($url =~ /v=([a-z0-9_\-]{8,14})/i) {
+                    	$url = $1;
+                    	$title =~ s/^[\n\r\s]+//s;
+                    	$title =~ s/[\n\r\s]+$//s;
+                        printf "Got playlist item $url \"$title\"\n";
+                        push @ARGV, "youtu.be/$url";
+                    }
+				};
+				(m!<title>\s*(.*?)\s*</title>! && ($title = $1)) &&
+				(m!url_encoded_fmt_stream_map(=|"\s*:\s*")([^"]+?)"!s && ($z = $2)) &&
+				do {
+					# $new_video_id = $video_id unless $new_video_id;
+
+					$title =~ s/&.*?;//g;
+					$title =~ s/^\s*youtube\s*-?\s*//i;
+					$title =~ s/\s*-\s*youtube\s*$//i;
+
+					my @x = split(",", $z);
+					if (@x == 1) {
+						$z =~ s/%([0-9A-F]{2})/chr hex $1/ge;
+						@x = split ",", $z;
+					}
+					my @b;
+
+					for (@x) {
+                        my @y = split m#\\u0026|&#, $_;
+                        push @b, {};
+                        for (@y) {
+                            if (/^url=(.*)/) {
+                                my $url = $1;
+                                $url =~ s/%([0-9A-F]{2})/chr hex $1/ge;
+                                $b[$#b]->{'url'} = $url;
+                            }
+                            elsif (/^(\w+)=(.*)/) {
+                                my ($key, $value) = ($1, $2);
+                                $value =~ s/%([0-9A-F]{2})/chr hex $1/ge;
+                                $b[$#b]->{$key} = $value if @b > 0;
+                            }
+                        }
+					}
+
+					for my $b (@b) {
+						if ($b->{url}) {
+							$b->{mime} = $b->{type};
+							$b->{mime} =~ s/[ ;].*//;
+							printf "Available: %2d = %6s %s\n", $b->{itag}, $b->{quality}, $b->{mime};
+							if ($b->{sig}) {
+                                $b->{url} .= '&signature=' . $b->{sig};
+							}
+						}
+					}
+
+					printf "Looking for size %s\n", $forcesize if $forcesize;
+					printf "Looking for type %s\n", $forceformat if $forceformat;
+
+					my @f = sort {
+						sub typenum {
+							$_ = shift;
+							return 100 if $forceformat && m!$forceformat!;
+							return 1 if m!^video/x-flv!;
+							return 2 if m!^video/3gpp!;
+							return 3 if m!^video/webm!;
+							return 4 if m!^video/mp4!;
+							return 0;
+						}
+						sub qualitynum {
+							$_ = shift;
+							return 100 if $forcesize && m!$forcesize!;
+							return 1 if m!^small!;
+							return 2 if m!^medium!;
+							return 3 if m!^large!;
+							return 4 if m!^hd720!;
+							return 5 if m!^hd1080!;
+							return 0;
+						}
+						my $r = (typenum($b->{mime}) <=> typenum($a->{mime})) * 5 + (qualitynum($b->{quality}) <=> qualitynum($a->{quality})) * 100;
+						$r;
+					} @b;
+
+					printf "Picked %s %s from %d options\n", $f[0]->{quality}, $f[0]->{mime}, scalar @f;
+					if ($f[0]->{mime} =~ m!^\S+?\/(\S+)!) {
+						$extension = $1;
+						$extension =~ s/^x\-//;
+					}
+					$urldata = $f[0]->{url};
+
+					last if $urldata;
+				};
+				$title =~ s/\&.*?\;//g;
+
+                unlink $cookiefile;
+				warn "metadata not found in: $metadata";
+				next mainloop;
+			}
+
+			die "Video IDs don't match: $video_id :: $new_video_id"
+				if $video_id ne $new_video_id;
+
+			$nicetitle = $title;
+			$nicetitle =~ s/["'\\\/:]/./g;
+			$nicetitle =~ s/&.*?;//g;
+			$nicetitle = "$nicetitle [youtube $video_id].$extension";
+			last;
+		};
+		m#^break\.com$# && do
+		{
+			print "Getting metadata [Break Video]...";
+			my $metadata = `wget -q -O - -U "Mozilla/5.0" "http://www.break.com$video_id"`
+				|| die "Couldn't get metadata: $!";
+
+			print " done.\n";
+
+			$metadata =~ m#videoPath.*?(http://[^'"]+)#i && do { $urldata = $1; 1; } or die "can't find videoPath";
+			$metadata =~ m#sGlobalContentFilePath='([^']+)# && do { $urldata .= $1; 1; } or die "can't find sGlobalContentFilePath";
+			$metadata =~ m#sGlobalFileName='([^']+)# && do { $nicetitle = "$1.flv"; $urldata .= "/$nicetitle"; 1; } or die "can't find sGlobalFileName";
+			last;
+		};
+		m#^video.google.com$# && do
+		{
+			print "Getting metadata [Google Video]...";
+			my $metadata = `wget -q -O - -U "Mozilla/5.0" "http://video.google.com.au/videoplay?docid=$video_id"`
+				|| die "Couldn't get metadata: $!";
+
+			print " done.\n";
+
+# 			$metadata =~ m#(http://.*video.google.com/videodownload\?[^\'\"]+)# && do { $urldata = $1; 1; } or die "can't find videodownload URI";
+			for ($metadata) {
+				$metadata =~ m#<title>([^<]+)# && do {
+					$nicetitle = "$1.mp4";
+					$nicetitle =~ s/[^a-z0-9\s\-_\%\=]/./gi;
+				};
+				m#(http://.*video.google.com/videodownload\?[^\'\"]+)# && do {
+					$urldata = $1;
+					last;
+				};
+				m#(http://.*googlevideo.com/videoplayback[^"> \']+)# && do {
+					$urldata = $1;
+					$urldata =~ s/%([0-9A-F]{2})/pack "H2", $1/egi;
+					last;
+				};
+
+				warn "metadata not found";
+				next mainloop;
+			}
+			last;
+		};
+		m#vimeo.com$# && do {
+			print "Getting metadata [Vimeo]...";
+			my $metadata = `wget -q -O - -U "Mozilla/5.0" "http://vimeo.com/moogaloop/load/clip:$video_id"`
+				|| die "Couldn't get metadata: $!";
+			print " done.\n";
+
+			if ($metadata =~ m#<caption>([^<]*)<.*<request_signature>([^<]*)<.*<request_signature_expires>([^<]*)<#s)
+			{
+				$nicetitle = "$1";
+				$urldata = "http://www.vimeo.com/moogaloop/play/clip:$video_id/$2/$3/?q=sd";
+				$nicetitle =~ s/[^a-z0-9\s\-_\%\=]/./gi;
+				$nicetitle = "$nicetitle [vimeo:$video_id].flv";
+			}
+			else {
+				warn "metadata not found in: $metadata";
+				next mainloop;
+			}
+			last;
+		};
+		# default
+		do {
+			print "Getting metadata [Unknown]...";
+			my $metadata = `wget -q -O - -U "Mozilla/5.0" --keep-session-cookies --save-cookies "$cookiefile" "$hostsite" | tee videodownload-metadata`
+				|| die "Couldn't get metadata: $!";
+
+			print " done.\n";
+
+			$metadata =~ m#flv_url=(http%3A[^&]+)# && do { $urldata = $1; 1; } or
+			$metadata =~ m#(http://.*?\.mpg.*?)[\s\"\']# && do { $urldata = $1; 1; } or
+			$metadata =~ m#(http://.*?\.mp4.*?)[\s\"\']# && do { $urldata = $1; 1; } or
+			$metadata =~ m#(http://.*?\.flv.*?)[\s\"\']# && do { $urldata = $1; 1; } or
+			$metadata =~ m#(http%3A%2F%2F.*?mp4.*?)\&# && do { $urldata = $1; $urldata =~ s#%([0-9A-F]{2})#chr hex $1#eg; } or
+			$metadata =~ m#(http%3A%2F%2F.*?flv.*?)\&# && do { $urldata = $1; $urldata =~ s#%([0-9A-F]{2})#chr hex $1#eg; } or
+			do {
+				warn "can't automagically extract video from this URI";
+				next mainloop;
+			};
+			$urldata =~ s#\\(.)#$1#g;
+			$urldata =~ s#.*http://#http://#;
+			$urldata =~ s#%([0-9A-F]{2})#chr hex $1#egi;
+			$nicetitle = $urldata;
+			$nicetitle =~ s#^.*?([^/]+)\.\w+$#$1.flv#;
+			$metadata =~ m#<title>([^<]+)</title># && do { $nicetitle = $1; };
+			$nicetitle =~ s#[\s\'\n]+#_#gs;
+			$metadata =~ m#<title>([^<]+)# && do { $nicetitle = "$1.flv"; $nicetitle =~ s#\s+# #g; };
+			$nicetitle =~ s#/#_#gs;
+
+			last;
+		};
+	}
+
+	print "Getting video...";
+	system(qw/wget -c -t 5 -T 30 -O/,$nicetitle,"-U","Mozilla/5.0 (X11; Linux x86_64; rv:26.0) Gecko/20100101 Firefox/26.0","--keep-session-cookies","--referer","http://youtube.com/watch?v=$video_id","--load-cookies",$cookiefile,$urldata)
+		&& do {
+			unlink $cookiefile;
+			warn "Download failed: $!";
+			next;
+		};
+	print " done.\n";
+
+	system("touch", $nicetitle);
+
+	unlink $cookiefile;
+
+	#print "Converting...";
+	#system(qw/ffmpeg -i/,"${nicetitle}.flv",qw/-ab 56 -ar 22050 -b 500 -s 320x240/,"${nicetitle}.mov")
+	#	|| die "Conversion failed: $!";
+	#print " done.\n";
+
+	printf "Video saved as %s\n", $nicetitle;
+
+	if ($play)
+	{
+		waitpid $playerpid,0
+			if $playerpid;
+	
+		$playerpid = fork();
+		if ($playerpid == 0) {
+			exec("mpv", $nicetitle);
+			exit 0;
+		}
+	}
+}
+
+waitpid $playerpid,0
+	if $playerpid;

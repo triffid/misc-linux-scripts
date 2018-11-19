@@ -1,0 +1,1 @@
+mpv tv:// --tv-width 1280 --tv-height 720 --tv-fps 60 --tv-alsa --tv-amode 1 --tv-adevice hw.2 --tv-audiorate=8000 --tv-forceaudio --tv-immediatemode=no --tv-mjpeg --tv-buffersize=32

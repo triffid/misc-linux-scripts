@@ -1,0 +1,32 @@
+#!/bin/bash
+
+cd /var/db/pkg
+
+SHORT=1
+
+while [[ "${1:0:1}" == "-" ]]; do
+	OPT="$1"
+	shift
+	if [ "$OPT" == "-l" ] || [ "$OPT" == "--long" ]; then SHORT=0; fi
+	# insert here
+	
+	if [ "$OPT" == "--" ]; then break; fi
+done
+
+while [ -n "$1" ]; do
+	for F in *-*/*; do
+		if [ -d "$F" ]; then
+			if [ -r "$F/CONTENTS" ]; then
+				if egrep -q "${1}( .*|)$" "$F/CONTENTS"; then
+					echo "$F: "
+					egrep -h "${1}( .*|)$" "$F/CONTENTS" | \
+						( if [ "$SHORT" == "1" ]; then head; else cat; fi; ) | \
+						# perl '-MDigest::MD5 qw/md5_hex/' -pe 's#^\s*(\w+) (/\w+\S+) ([0-9a-f]+) (\d+)#sprintf("%s\t%s[%s]\t%u",$2,$3,((md5_hex(`cat $2`) eq $3)?"\033[32mY\033[m":"\033[31mX\033[m"),$4)#e;' | \
+						# perl -pe 's/\s(\d+)$/"\t".localtime($1)/e; print "\t"'
+						perl '-MDigest::MD5 qw/md5_hex/' -pe 's#^\s*(\w+) (/\w+\S+) ([0-9a-f]+) (\d+)#sprintf("%s\t%s[%s]\t%u",$2,$3,((md5_hex(`cat $2`) eq $3)?"\033[32mY\033[m":"\033[31mX\033[m"),$4)#e; s/\s(\d+)$/"\t".localtime($1)/e; print "\t"'
+				fi
+			fi
+		fi
+	done
+	shift
+done
