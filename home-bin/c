@@ -32,7 +32,7 @@ done
 
 if [[ "$#" -gt 0 ]]
 then
-	echo "\t$@" >> "$TEMP"
+	echo $'\t'"$@" >> "$TEMP"
 else
 	cat >> "$TEMP"
 fi
