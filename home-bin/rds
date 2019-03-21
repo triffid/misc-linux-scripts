@@ -4,12 +4,30 @@ import sys
 from pprint import pprint, pformat
 import argparse
 from operator import itemgetter
+from math import log10, ceil, floor
+
+def getvo(r1, r2):
+	return r2 / (r1 + r2)
+
+def getbest(es, r1dec, r2dec):
+	r = []
+	for r1 in es:
+		for r2 in es:
+			r.append([r1 * r1dec, r2 * r2dec, getvo(r1 * r1dec, r2 * r2dec)])
+	return r
+
+def sisuf(val):
+	gr = min(max(int(floor(log10(val) / 3)), -8), 8)
+	return "%1.2f%s"%(val / (10 ** (3 * gr)), (gr != 0 and "yzafpnum_kMGTPEZY"[gr + 8]) or "")
 
 eseries = {
+	 3: [100, 220, 470],
 	 6: [100, 150, 220, 330, 470, 680],
 	12: [100, 120, 150, 180, 220, 270, 330, 390, 470, 560, 680, 820],
 	24: [100, 110, 120, 130, 150, 160, 180, 200, 220, 240, 270, 300, 330, 360, 390, 430, 470, 510, 560, 620, 680, 750, 820, 910],
 	48: [100, 105, 110, 115, 121, 127, 133, 140, 147, 154, 162, 169, 178, 187, 196, 205, 215, 226, 237, 249, 261, 274, 287, 301, 316, 332, 248, 365, 383, 402, 422, 442, 464, 487, 511, 536, 562, 590, 619, 649, 681, 715, 750, 787, 825, 866, 909, 953],
+	96: [100, 102, 105, 107, 110, 113, 115, 118, 121, 124, 127, 130, 133, 137, 140, 143, 147, 150, 154, 158, 162, 165, 169, 174, 178, 182, 187, 191, 196, 200, 205, 210, 215, 221, 226, 232, 237, 243, 249, 255, 261, 267, 274, 280, 287, 294, 301, 309, 316, 324, 332,340, 348, 357, 365, 374, 383, 392, 402, 412, 422, 432, 442, 453, 464, 475, 487, 499, 511, 523, 536, 549, 562, 576, 590, 604, 619, 634, 649, 665, 681, 698, 715, 732, 750, 768, 787, 806, 825, 845, 866, 887, 909, 931, 953, 976],
+	192: [100, 101, 102, 104, 105, 106, 107, 109, 110, 111, 113, 114, 115, 117, 118, 120, 121, 123, 124, 126, 127, 129, 130, 132, 133, 135, 137, 138, 140, 142, 143, 145, 147, 149, 150, 152, 154, 156, 158, 160, 162, 164, 165, 167, 169, 172, 174, 176, 178, 180, 182,184, 187, 189, 191, 193, 196, 198, 200, 203, 205, 208, 210, 213, 215, 218, 221, 223, 226, 229, 232, 234, 237, 240, 243, 246, 249, 252, 255, 258, 261, 264, 267, 271, 274, 277, 280, 284, 287, 291, 294, 298, 301, 305, 309, 312, 316, 320, 324, 328, 332, 336, 340, 344, 348, 352, 357, 361, 365, 370, 374, 379, 383, 388, 392, 397, 402, 407, 412, 417, 422, 427, 432, 437, 442, 448, 453, 459, 464, 470, 475, 481, 487, 493, 499, 505, 511, 517, 523, 530, 536, 542, 549, 556, 562, 569, 576, 583, 590, 597, 604, 612, 619, 626, 634, 642, 649, 657, 665, 673, 681, 690, 698, 706, 715, 723, 732, 741, 750, 759, 768, 777, 787, 796, 806, 816, 825, 835, 845, 856, 866, 876, 887, 898, 909, 920, 931, 942, 953, 965, 976, 988]
 }
 
 parser = argparse.ArgumentParser(description='Resistor Divider Search')
@@ -17,31 +35,21 @@ parser = argparse.ArgumentParser(description='Resistor Divider Search')
 parser.add_argument('Vin', metavar='Vin', type=float, help='Input voltage')
 parser.add_argument('Vout', metavar='Vout', type=float, help='Output voltage')
 
-parser.add_argument('-e', '--series', help='E-series to use', type=int, choices=[6,12,24,48], default=12)
+parser.add_argument('-e', '--series', help='E-series to use', type=int, choices=[3, 6,12,24,48,96,192], default=12)
 parser.add_argument('-r', '--results', help='Results to show', type=int, default=1)
+parser.add_argument('-c', '--current', help='Max current in divider', type=float, default=0)
+parser.add_argument('-i', '--impedance', help='Maximum thevenin impedance from divider', type=float, default=0)
 
 args = parser.parse_args()
-
-#pprint(args.Vin)
-#pprint(args.Vout)
-#pprint(eseries[args.series])
 
 vin  = args.Vin
 vout = args.Vout
 es   = eseries[args.series]
 rat  = vout / vin
 
-def getvo(r1, r2):
-	return r2 / (r1 + r2)
+b = getbest(es, 10 ** ceil(log10(vin) - log10(vout)), 1) + getbest(es, 10 ** floor(log10(vin) - log10(vout)), 1)
 
-best = []
-
-for r1 in es:
-	for r2 in es:
-		best.append([r1, r2, abs((getvo(r1, r2) * vin) - vout)])
-for r1 in es:
-	for r2 in es:
-		best.append([r1 * 10, r2, abs((getvo(r1 * 10, r2) * vin) - vout)])
+best = list(map(lambda b: [b[0], b[1], abs((b[2] * vin) - vout)], b))
 
 best.sort(key=itemgetter(2))
 
@@ -51,8 +59,28 @@ for i in range(args.results):
 	r1 = best[i][0]
 	r2 = best[i][1]
 	rat = getvo(r1, r2)
+	thev = 1 / ((1 / r1) + (1 / r2))
+	#if (thev > args.impedance):
+	if (args.impedance):
+		#print("Altering values by %+gx to achieve desired impedance"%(10 ** floor(log10(args.impedance) - log10(thev))))
+		r1 *= 10 ** floor(log10(args.impedance) - log10(thev))
+		r2 *= 10 ** floor(log10(args.impedance) - log10(thev))
+		thev = 1 / ((1 / r1) + (1 / r2))
+
+	curr = vin / (r1 + r2)
+
+	#if (curr > args.current):
+	if (args.current):
+		#print("Altering values by %+gx to achieve desired current"%(10 ** ceil(log10(curr) - log10(args.current))))
+		r1 *= 10 ** ceil(log10(curr) - log10(args.current))
+		r2 *= 10 ** ceil(log10(curr) - log10(args.current))
+		thev = 1 / ((1 / r1) + (1 / r2))
+		curr = vin / (r1 + r2)
+
+	powr = curr * vin
 	vo = rat * vin
 	erro = (vo - vout) * 100 / vout
 	vi = vout / rat
 	erri = (vi - vin) * 100 / vin
-	print("\tR1 %d R2 %d Vin %gv ->\tVout %gv (%gv %+4.1g%%)\tor Vout %gv -> Vin %gv (%gv %+g%%)"%(r1, r2, vin, vo, vout, erro, vout, vout / rat, vin, erri))
+	print("\tR1 = %sΩ\tR2 = %sΩ\n\t\tVin  %sv -> Vout %sv (%sv %+2.1f%%)\n\t\tVout %sv -> Vin  %sv (%sv %+2.1f%%)"%(sisuf(r1), sisuf(r2), sisuf(vin), sisuf(vo), sisuf(vout), erro, sisuf(vout), sisuf(vout / rat), sisuf(vin), erri))
+	print("\t\tThevenin Impedance: %sΩ\tCurrent: %sA\tPower: %sW"%(sisuf(thev), sisuf(curr), sisuf(powr)))
