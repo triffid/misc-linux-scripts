@@ -17,7 +17,7 @@ r = e.getroot()
 
 footprints = {}
 
-output_format = "%-12s %-16s %-21s %-21s %-16s %-21s"
+output_format = "%-12s %-16s %-21s %-21s %-16s %-21s %s"
 
 for l in r.findall('./drawing/board/libraries/'):
 	#print("Lib '%s'" % l.get('name'))
@@ -37,7 +37,7 @@ for l in r.findall('./drawing/board/libraries/'):
 			if (s.get('name') in ('1', 'A', 'P1', '_1')):
 				footprints["%s/%s"%(l.get('name'), p.get('name'))] = (float(s.get('x')), float(s.get('y')))
 
-print(output_format % ('Part', 'Value', 'Package', 'Position (x y)', 'Orientation', 'Pin 1 (x y)'))
+print(output_format % ('Part', 'Value', 'Package', 'Position (x y)', 'Orientation', 'Pin 1 (x y)', 'Errata'))
 print()
 
 rr = re.compile('(M?)R(\d+)')
@@ -59,4 +59,8 @@ for e in r.findall('./drawing/board/elements/'):
 				pin1[0] = -pin1[0]
 			pin1 = "(%2.5g %2.5g)" % (pin1[0] + float(e.attrib['x']), pin1[1] + float(e.attrib['y']))
 		posxy = "(%2.5g %2.5g)" % (float(e.attrib['x']), float(e.attrib['y']))
-		print(output_format % (e.attrib['name'], e.attrib['value'], e.attrib['package'], posxy, e.attrib.get('rot', 'R0'), pin1))
+		extra = ""
+		for a in sorted(e.findall('./'), key=lambda n: str.lower(n.attrib['name'])):
+			if ('value' in a.attrib):
+				extra += "%s:%s\t" % (a.attrib['name'], a.attrib['value'])
+		print(output_format % (e.attrib['name'], e.attrib['value'], e.attrib['package'], posxy, e.attrib.get('rot', 'R0'), pin1, extra))
