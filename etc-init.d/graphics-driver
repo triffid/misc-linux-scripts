@@ -1,0 +1,47 @@
+#!/sbin/openrc-run
+# Copyright 1999-2013 Gentoo Foundation
+# Distributed under the terms of the GNU General Public License v2
+
+# /etc/init.d/graphics-driver
+# automatically load appropriate nvidia userspace library which matches kernel version
+#
+# for best results:
+#     list /lib/modules in CONFIG_PROTECT so emerge doesn't remove modules from other kernels
+#     emerge nvidia-drivers && service graphics-driver restore when updating your drivers and kernel
+#     make xdm depend on this
+
+extra_commands="save restore"
+
+CURRENTVER=$(cd /var/db/pkg/x11-drivers/; echo nvidia-drivers-*)
+KERNELVER=$(cat /sys/module/nvidia/version)
+
+depend() {
+	need localmount modules
+	before xdm
+}
+
+restore() {
+	if [ ! -f "/usr/portage/packages/x11-drivers/${CURRENTVER}.tbz2" ]
+	then
+		save
+	fi
+	emerge -Ku1Oq =x11-drivers/nvidia-drivers-$(</sys/module/nvidia/version)
+}
+
+save() {
+	quickpkg x11-drivers/nvidia-drivers
+}
+
+start() {
+	if [ "$CURRENTVER" != "$KERNELVER" ]
+	then
+		restore
+	fi
+}
+
+stop() {
+	if [ ! -f "/usr/portage/packages/x11-drivers/${CURRENTVER}.tbz2" ]
+	then
+		save
+	fi
+}
