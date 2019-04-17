@@ -35,9 +35,9 @@ parser = argparse.ArgumentParser(description='Resistor Divider Search')
 parser.add_argument('Vin', metavar='Vin', type=float, help='Input voltage')
 parser.add_argument('Vout', metavar='Vout', type=float, help='Output voltage')
 
-parser.add_argument('-e', '--series', help='E-series to use', type=int, choices=[3, 6,12,24,48,96,192], default=12)
-parser.add_argument('-r', '--results', help='Results to show', type=int, default=1)
-parser.add_argument('-c', '--current', help='Max current in divider', type=float, default=0)
+parser.add_argument('-e', '--series', help='E-series to use', type=int, choices=[3, 6,12,24,48,96,192], default=24)
+parser.add_argument('-r', '--results', help='Results to show', type=int, default=2)
+parser.add_argument('-c', '--current', help='Max current in divider', type=float, default=1e-4)
 parser.add_argument('-i', '--impedance', help='Maximum thevenin impedance from divider', type=float, default=0)
 
 args = parser.parse_args()
