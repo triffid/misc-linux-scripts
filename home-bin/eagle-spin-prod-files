@@ -1,0 +1,78 @@
+#!/bin/bash
+
+SCHEMATIC="$(/bin/ls -1rt *sch | tail -n1)"
+BOARD="${SCHEMATIC%%.sch}.brd"
+NAME="${SCHEMATIC%%.sch}"
+
+if [ -z "$SCHEMATIC" ] || [ ! -r "$BOARD" ] || [ -z "$1" ]
+then
+	echo "Usage: $0 <revision>"
+	echo
+	echo "Example: $0 rev3"
+	exit 1
+fi
+
+REV="$1"
+
+NAMEREV="${NAME}-${REV}"
+
+echo "Using $NAMEREV"
+
+O="$NAMEREV"
+
+rm -rf "$O"
+mkdir "$O"
+
+cp "$SCHEMATIC" "$O/${NAMEREV}.sch"
+cp "$BOARD" "$O/${NAMEREV}.brd"
+
+pushd "$O" >/dev/null || exit 1
+
+zip "${NAMEREV}-DesignFiles-Eagle7.zip" "${NAMEREV}.sch" "${NAMEREV}.brd" || exit 1
+
+wine 'H:\Private\Software\eagle\bin\eaglecon.exe' -N- -C "
+	EDIT .sch; print file ${NAMEREV}-schematic.pdf paper A4 sheets ALL landscape;
+	EDIT .brd; display none dimension pads tPlace tDocu tValue tStop; print file ${NAMEREV}-Assembly-TOP.pdf paper A4 sheets ALL landscape;
+	EDIT .brd; display all; group all; mirror (>0 0); group; display none dimension pads tPlace tDocu tValue tStop; print file ${NAMEREV}-Assembly-BOTTOM.pdf paper A4 sheets ALL landscape; undo;
+	quit;" \
+	"${NAMEREV}.sch"
+
+zip "${NAMEREV}-DesignFiles-Eagle7.zip" "${NAMEREV}-schematic.pdf" || exit 1
+
+LAYERS=$(eagle-brd-export-layercount "${NAMEREV}.brd")
+
+Cam2Gerber.py -b "${NAMEREV}.brd" -c "$HOME/eagle/eagle-7_${LAYERS}layer.cam"
+rm *dri *gpi
+
+zip "${NAMEREV}-GERBERS_AND_STENCIL.zip" "${NAMEREV}_"* || exit 1
+
+brd2scad "${NAMEREV}.brd"
+
+rm "${NAMEREV}_"*
+
+eagle-brd-export-bom "${NAMEREV}.brd" > "${NAMEREV}-BOM.csv"
+eagle-brd-export-assembly "${NAMEREV}.brd" > "${NAMEREV}-Assembly.txt"
+
+zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly.txt" "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf"
+
+for ZIP in *zip
+do
+	unzip -l "$ZIP" >> "${NAMEREV}-Manifest.txt"
+done
+
+popd >/dev/null
+
+rm -f "${NAMEREV}.zip"
+
+zip "${NAMEREV}.zip" "$O/${NAMEREV}-DesignFiles-Eagle7.zip" "$O/${NAMEREV}-schematic.pdf" "$O/${NAMEREV}-GERBERS_AND_STENCIL.zip" "$O/${NAMEREV}-Assembly.zip" "$O/${NAMEREV}-BOM.csv"
+
+mv "$O/${NAMEREV}-Manifest.txt" ./
+mv "$O/${NAMEREV}.scad" ./
+
+unzip -l "${NAMEREV}.zip" >> "${NAMEREV}-Manifest.txt"
+
+rm -rf "$O"
+
+echo "${NAMEREV}.zip is ready"
+
+exit 0
