@@ -13,7 +13,7 @@
 extra_commands="save restore"
 
 CURRENTVER=$(cd /var/db/pkg/x11-drivers/; echo nvidia-drivers-*)
-KERNELVER=$(cat /sys/module/nvidia/version)
+KERNELVER=$(< /sys/module/nvidia/version)
 
 depend() {
 	need localmount modules
@@ -25,7 +25,10 @@ restore() {
 	then
 		save
 	fi
-	emerge -Ku1Oq =x11-drivers/nvidia-drivers-$(</sys/module/nvidia/version)
+	if [ ! -d "/var/db/pkg/x11-drivers/nvidia-drivers-${KERNELVER}" ]
+	then
+		emerge -Ku1Oq "=x11-drivers/nvidia-drivers-${KERNELVER}"
+	fi
 }
 
 save() {
