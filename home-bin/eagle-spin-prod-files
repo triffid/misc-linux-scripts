@@ -1,18 +1,53 @@
 #!/bin/bash
 
-SCHEMATIC="$(/bin/ls -1rt *sch | tail -n1)"
+errormsg () {
+	echo -e "Error: \033[1m${1}!\033[0m"
+	echo
+	echo "Usage: $0 [-n] <revision> [file.sch]"
+	echo
+	echo $'\t-n\t'"Don't delete temporary working directory after successful completion."
+	echo
+	echo $'\t'"revision: The revision name to use when generating output files."
+	echo
+	echo $'\t'"file.sch: The eagle schematic to operate on. Defaults to most recently altered in current directory."
+	echo
+	echo "Example: ${0##*/} rev3"
+	echo
+	exit 1
+}
+
+case "$1" in
+	-n|--nodelete)
+		NODELETE=1
+		shift
+		;;
+esac
+
+REV="$1"
+SCHEMATIC="$2"
+
+if [ -z "$SCHEMATIC" ]
+then
+	SCHEMATIC="$(/bin/ls -1rt *sch | tail -n1)"
+fi
+
 BOARD="${SCHEMATIC%%.sch}.brd"
 NAME="${SCHEMATIC%%.sch}"
 
-if [ -z "$SCHEMATIC" ] || [ ! -r "$BOARD" ] || [ -z "$1" ]
+if [ -z "$SCHEMATIC" ] || [ ! -r "$SCHEMATIC" ]
 then
-	echo "Usage: $0 <revision>"
-	echo
-	echo "Example: $0 rev3"
-	exit 1
+	errormsg "No schematic found"
 fi
 
-REV="$1"
+if [ ! -r "$BOARD" ]
+then
+	errormsg "No board found"
+fi
+
+if [ -z "$REV" ]
+then
+	errormsg "No revision specified"
+fi
 
 NAMEREV="${NAME}-${REV}"
 
@@ -32,8 +67,11 @@ zip "${NAMEREV}-DesignFiles-Eagle7.zip" "${NAMEREV}.sch" "${NAMEREV}.brd" || exi
 
 wine 'H:\Private\Software\eagle\bin\eaglecon.exe' -N- -C "
 	EDIT .sch; print file ${NAMEREV}-schematic.pdf paper A4 sheets ALL landscape;
-	EDIT .brd; display none dimension pads tPlace tDocu tValue tStop; print file ${NAMEREV}-Assembly-TOP.pdf paper A4 sheets ALL landscape;
-	EDIT .brd; display all; group all; mirror (>0 0); group; display none dimension pads tPlace tDocu tValue tStop; print file ${NAMEREV}-Assembly-BOTTOM.pdf paper A4 sheets ALL landscape; undo;
+	EDIT .brd; set color_layer dimension 15; set color_layer tPlace 8; set color_layer tDocu 8; set color_layer tValue 1; set color_layer tStop 8;
+	display none dimension pads tPlace tDocu tValue tStop; print file ${NAMEREV}-Assembly-TOP.pdf paper A4 sheets ALL landscape;
+	display all; group all; mirror (>0 0); group;
+		display none dimension pads tPlace tDocu tValue tStop; print file ${NAMEREV}-Assembly-BOTTOM.pdf paper A4 sheets ALL landscape;
+	undo;
 	quit;" \
 	"${NAMEREV}.sch"
 
@@ -50,7 +88,9 @@ brd2scad "${NAMEREV}.brd"
 
 rm "${NAMEREV}_"*
 
-eagle-brd-export-bom "${NAMEREV}.brd" > "${NAMEREV}-BOM.csv"
+eagle-brd-export-bom "${NAMEREV}.brd" | head -n1 > "${NAMEREV}-BOM.csv"
+eagle-brd-export-bom "${NAMEREV}.brd" | tail -n+2 | sort -h -k 1.2 -r >> "${NAMEREV}-BOM.csv"
+
 eagle-brd-export-assembly "${NAMEREV}.brd" > "${NAMEREV}-Assembly.txt"
 
 zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly.txt" "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf"
@@ -71,7 +111,10 @@ mv "$O/${NAMEREV}.scad" ./
 
 unzip -l "${NAMEREV}.zip" >> "${NAMEREV}-Manifest.txt"
 
-rm -rf "$O"
+if [ -z "$NODELETE" ]
+then
+	rm -rf "$O"
+fi
 
 echo "${NAMEREV}.zip is ready"
 
