@@ -1,0 +1,69 @@
+#!/sbin/openrc-run
+# Copyright (c) 2007-2015 The OpenRC Authors.
+# See the Authors file at the top-level directory of this distribution and
+# https://github.com/OpenRC/openrc/blob/master/AUTHORS
+#
+# This file is part of OpenRC. It is subject to the license terms in
+# the LICENSE file found in the top-level directory of this
+# distribution and at https://github.com/OpenRC/openrc/blob/master/LICENSE
+# This file may not be copied, modified, propagated, or distributed
+# except according to the terms contained in the LICENSE file.
+
+SHDIR="/lib/netifrc/sh"
+MODULESDIR="/lib/netifrc/net"
+MODULESLIST="${RC_SVCDIR}/nettree"
+
+_config_vars="config metric routes"
+
+[ -z "${IN_BACKGROUND}" ] && IN_BACKGROUND="NO"
+
+description="Configures network interfaces."
+
+# Handy var so we don't have to embed new lines everywhere for array splitting
+__IFS=$'\n'
+
+#  Set the INIT to be openrc if this file is called directly
+: ${INIT:=openrc}
+if [ -f "$SHDIR/functions.sh" ]; then
+	. "$SHDIR/functions.sh"
+else
+	echo "$SHDIR/functions.sh missing. Exiting"
+	exit 1
+fi
+
+# Support bash arrays - sigh
+_array_helper()
+{
+	local _a=
+	eval _a=\$$1
+	_a=$(echo "${_a}" | sed -e 's:^[[:space:]]*::' -e 's:[[:space:]]*$::' -e '/^$/d' -e 's:[[:space:]]\{1,\}: :g')
+	[ -n "${_a}" ] && printf "%s\n" "${_a}"
+}
+
+depend()
+{
+	need localmount sysfs
+	after net net.lo bootmisc modules
+}
+
+start()
+{
+	local IFACE=${RC_SVCNAME/#net.}
+	local HOSTIF=${IFACE/%_*}
+	iw dev $HOSTIF interface add $IFACE type managed || eend $?
+
+	local config="$(_array_helper "config_${IFACE}")"
+	if [ -n "$config" ]
+	then
+		set -- $config
+		echo ip addr add dev $IFACE "$@"
+		ip addr add dev $IFACE "$@"
+	fi
+	eend $?
+}
+
+stop()
+{
+	iw dev ${RC_SVCNAME/#net.} del
+	eend $?
+}
