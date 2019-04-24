@@ -1,24 +1,48 @@
 modules="iproute2"
 
 dhcp="nodns nontp noarp"
+# dhcp_enp3s0="nogateway"
+
+metric_wlp4s0="2000"
+
+# ethernet - one client port, one host port
+config_enp3s0="dhcp"
+metric_enp3s0="500"
+
+#metric_enp0s31f6="500"
+modules_enp0s31f6="!ifplugd"
+# config_enp0s31f6="192.168.5.1/24"
+# config_wlp4s0_ap="192.168.6.1/24"
+
+bridge_br0="enp0s31f6"
+config_br0="192.168.5.1/24"
+bridge_forward_delay_br0="0"
+bridge_hello_time_br0="1000"
 
 postup() {
 	logger -t netifrc postup $IFACE
 
+	NUM=$( grep -P '^\s*\d+\s+'$IFACE'\b' /etc/iproute2/rt_tables | cut -d\  -f1 )
+
 	# ensure interface has a matching routing table
-	if ! grep -Pq '^\s*\d+\s+'$IFACE'\b' /etc/iproute2/rt_tables
+	if [ -z "$NUM" ]
 	then
-		NEWNUM=$( ( for I in {0..255}; do egrep -q ^$I'\b' /etc/iproute2/rt_tables || echo $I; done; ) | head -n1 )
-		printf "%-3d     %s\n" $NEWNUM $IFACE >> /etc/iproute2/rt_tables
+		NUM=$( ( for I in {0..255}; do egrep -q ^$I'\b' /etc/iproute2/rt_tables || echo $I; done; ) | head -n1 )
+		printf "%-3d     %s\n" $NUM $IFACE >> /etc/iproute2/rt_tables
 	fi
 
 	# ensure connections made on this interface stay on it
 	IPADDR=$(ip addr show dev $IFACE | perl -ne '/^\s*inet\s+([\d\.]+)/ && print "$1\n";')
-	ip rule add from $IPADDR lookup $IFACE table $IFACE
-	ip route show dev $IFACE | sed 's/^/ip route add table '$IFACE' dev '$IFACE' /' | /bin/sh
+	if ! ip rule show from $IPADDR lookup $IFACE | grep .
+	then
+		# order/preference is based on rt_table number plus 100
+		ip rule add from $IPADDR lookup $IFACE table $IFACE pref $(( $NUM + 100 ))
+	fi
+	ip route show dev $IFACE | sed 's/^/ip route add table '$IFACE' dev '$IFACE' /' | sed 's/linkdown//' | /bin/sh
 
 	# start dnsmasq on NAT interface
-	[ "$IFACE" == "enp0s31f6" ] && /etc/init.d/dnsmasq start
+	[ "$IFACE" == "enp0s31f6" ] && /etc/init.d/dnsmasq   start
+	[ "$IFACE" == "wlp4s0_ap" ] && /etc/init.d/dnsmasq-1 start
 
 	# list routes for ethernet and wifi as non-vpn
 	[ "$IFACE" == "wlp4s0"    ] && ip route show dev $IFACE | sed 's/^/ip route add table china dev '$IFACE' /' | /bin/sh
@@ -30,7 +54,7 @@ postup() {
 predown() {
 	logger -t netifrc predown $IFACE
 
-	ip rule show table $IFACE | sed 's/.*:/ip rule del table 'IFACE' /'
+	ip rule show table $IFACE | sed 's/.*:/ip rule del table '$IFACE' /' | /bin/sh
 	ip route show table $IFACE | sed 's/^/ip route del table '$IFACE' /' | /bin/sh
 
 	# remove routes from non-vpn routing table
@@ -39,3 +63,16 @@ predown() {
 
 	true
 }
+
+# ethernet - bridged
+# bridge_br0="enp3s0 enp0s31f6"
+# bridge_forward_delay_br0=0
+# slaves_bond0="wlan0 eth0"
+# config_bond0="dhcp"
+# depend_wlan0() {
+# 	need net.bond0
+# }
+
+# postup() {
+# 	[ "$IFACE" == "wlan0" ] && ( IFACE="bond0"; IFVAR="bond0"; dhcpcd_start; )
+# }
