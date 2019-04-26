@@ -1,6 +1,6 @@
 #!/bin/bash
 
-pia-to-unbound.py > /etc/unbound/unbound.pia.new
+pia-to-unbound.py > /etc/unbound/unbound.pia.new || exit 1
 
 if [ $(wc -l /etc/unbound/unbound.pia.new | cut -d\  -f1) -ge 200 ]
 then
