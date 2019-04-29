@@ -3,7 +3,7 @@
 errormsg () {
 	echo -e "Error: \033[1m${1}!\033[0m"
 	echo
-	echo "Usage: $0 [-n] <revision> [file.sch]"
+	echo "Usage: $0 [-n] [-c|--cam cam-job-file] <revision> [file.sch]"
 	echo
 	echo $'\t-n\t'"Don't delete temporary working directory after successful completion."
 	echo
@@ -16,12 +16,25 @@ errormsg () {
 	exit 1
 }
 
-case "$1" in
-	-n|--nodelete)
-		NODELETE=1
-		shift
-		;;
-esac
+while [[ "$1" =~ ^- ]]
+do
+	case "$1" in
+		-n|--nodelete)
+			NODELETE=1
+			shift
+			;;
+		-c|--cam)
+			CAMFILE="$2"
+			if [ ! -r "$CAMFILE" ]
+			then
+				echo "Error: cannot read '$CAMFILE'" >&2
+				exit 1
+			fi
+			shift
+			shift
+			;;
+	esac
+done
 
 REV="$1"
 SCHEMATIC="$2"
@@ -77,9 +90,13 @@ wine 'H:\Private\Software\eagle\bin\eaglecon.exe' -N- -C "
 
 zip "${NAMEREV}-DesignFiles-Eagle7.zip" "${NAMEREV}-schematic.pdf" || exit 1
 
-LAYERS=$(eagle-brd-export-layercount "${NAMEREV}.brd")
+if [ -z "$CAMFILE" ]
+then
+	LAYERS=$(eagle-brd-export-layercount "${NAMEREV}.brd")
+	CAMFILE="$HOME/eagle/eagle-7_${LAYERS}layer.cam"
+fi
 
-Cam2Gerber.py -b "${NAMEREV}.brd" -c "$HOME/eagle/eagle-7_${LAYERS}layer.cam"
+Cam2Gerber.py -b "${NAMEREV}.brd" -c "$CAMFILE"
 rm *dri *gpi
 
 zip "${NAMEREV}-GERBERS_AND_STENCIL.zip" "${NAMEREV}_"* || exit 1
