@@ -2,6 +2,8 @@
 
 SERIAL="$(lsusb -d 18d1:4ee7 -v 2>/dev/null | grep iSerial | awk '{ print $3; }')"
 
+adb -s $SERIAL shell 'cd /sdcard/DCIM/Camera; bash fix-pics.sh'
+
 adb -s $SERIAL shell '(echo address=127.0.0.1; echo port=1873; echo "[sdcard]"; echo path=/sdcard; echo use chroot = false; echo read only = false) > /sdcard/rsyncd.conf'
 
 adb -s $SERIAL shell 'rsync --daemon --config=/sdcard/rsyncd.conf --log-file=/sdcard/rsync.log --verbose' & sleep 0.5
