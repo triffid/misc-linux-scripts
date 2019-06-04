@@ -36,6 +36,8 @@ do
 	esac
 done
 
+### Check options and files
+
 REV="$1"
 SCHEMATIC="$2"
 
@@ -68,6 +70,8 @@ echo "Using $NAMEREV"
 
 O="$NAMEREV"
 
+### Generate working directory
+
 rm -rf "$O"
 mkdir "$O"
 
@@ -75,6 +79,8 @@ cp "$SCHEMATIC" "$O/${NAMEREV}.sch"
 cp "$BOARD" "$O/${NAMEREV}.brd"
 
 pushd "$O" >/dev/null || exit 1
+
+### Design Files
 
 zip "${NAMEREV}-DesignFiles-Eagle7.zip" "${NAMEREV}.sch" "${NAMEREV}.brd" || exit 1
 
@@ -90,9 +96,12 @@ wine 'H:\Private\Software\eagle\bin\eaglecon.exe' -N- -C "
 
 zip "${NAMEREV}-DesignFiles-Eagle7.zip" "${NAMEREV}-schematic.pdf" || exit 1
 
+### Gerbers
+
+LAYERS=$(eagle-brd-export-layercount "${NAMEREV}.brd")
+
 if [ -z "$CAMFILE" ]
 then
-	LAYERS=$(eagle-brd-export-layercount "${NAMEREV}.brd")
 	CAMFILE="$HOME/eagle/eagle-7_${LAYERS}layer.cam"
 fi
 
@@ -105,36 +114,67 @@ brd2scad "${NAMEREV}.brd"
 
 rm "${NAMEREV}_"*
 
+### BOM
+
 eagle-brd-export-bom "${NAMEREV}.brd" | head -n1 > "${NAMEREV}-BOM.csv"
 eagle-brd-export-bom "${NAMEREV}.brd" | tail -n+2 | sort -h -k 1.2 -r >> "${NAMEREV}-BOM.csv"
 
 unoconv -o "${NAMEREV}-BOM.xlsx" "${NAMEREV}-BOM.csv" || exit 1
 
+### Assembly
+
 eagle-brd-export-assembly "${NAMEREV}.brd" > "${NAMEREV}-Assembly.txt"
 
-zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly.txt" "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf"
+pdfunite "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf" "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly.pdf" && rm "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf"
+
+zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly.txt" "${NAMEREV}-Assembly.pdf"
+
+### Manifest
 
 for ZIP in *zip
 do
 	unzip -l "$ZIP" >> "${NAMEREV}-Manifest.txt"
 done
 
+### Board Info
+
+(
+	eagle-brd-dimension "${NAMEREV}.brd"
+	echo "Layer count:     $LAYERS"
+	echo "Date:            $(date +'%F %H:%M:%S %z')"
+	echo "Revision:        $REV"
+) > "${NAMEREV}-Board-Info.txt"
+
+### Construct production zip
+
 popd >/dev/null
 
 rm -f "${NAMEREV}.zip"
 
-zip "${NAMEREV}.zip" "$O/${NAMEREV}-DesignFiles-Eagle7.zip" "$O/${NAMEREV}-schematic.pdf" "$O/${NAMEREV}-GERBERS_AND_STENCIL.zip" "$O/${NAMEREV}-Assembly.zip" "$O/${NAMEREV}-BOM.xlsx"
+zip "${NAMEREV}.zip" "$O/${NAMEREV}-Board-Info.txt" "$O/${NAMEREV}-DesignFiles-Eagle7.zip" "$O/${NAMEREV}-schematic.pdf" "$O/${NAMEREV}-GERBERS_AND_STENCIL.zip" "$O/${NAMEREV}-Assembly.zip" "$O/${NAMEREV}-BOM.xlsx" "$O/${NAMEREV}-Manifest.txt"
 
-mv "$O/${NAMEREV}-Manifest.txt" ./
+### Generate Manifest
+
+for Z in {1..4}
+do
+	unzip -l "${NAMEREV}.zip" >> "$O/${NAMEREV}-Manifest.txt"
+	zip "${NAMEREV}.zip" "$O/${NAMEREV}-Manifest.txt"
+done
+
 mv "$O/${NAMEREV}.scad" ./
 
-unzip -l "${NAMEREV}.zip" >> "${NAMEREV}-Manifest.txt"
+### Notify completion
+
+echo
+cat "$O/${NAMEREV}-Board-Info.txt"
 
 if [ -z "$NODELETE" ]
 then
 	rm -rf "$O"
 fi
 
-echo "${NAMEREV}.zip is ready"
+echo
+echo -e "\033[32;1m${NAMEREV}.zip is ready\033[0m"
+echo
 
 exit 0
