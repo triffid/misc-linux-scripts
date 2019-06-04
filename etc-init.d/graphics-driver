@@ -32,7 +32,7 @@ restore() {
 }
 
 save() {
-	quickpkg x11-drivers/nvidia-drivers
+	quickpkg --include-config=y x11-drivers/nvidia-drivers
 }
 
 start() {
