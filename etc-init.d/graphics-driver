@@ -1,7 +1,9 @@
 #!/sbin/openrc-run
 # Copyright 1999-2013 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
-
+# 
+# Copyright (c) 2019 Triffid Hunter
+# 
 # /etc/init.d/graphics-driver
 # automatically load appropriate nvidia userspace library which matches kernel version
 #
