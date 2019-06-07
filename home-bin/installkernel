@@ -1,0 +1,42 @@
+#!/bin/bash
+
+set -e
+
+logger -t installkernel "installkernel '$0' '$1' '$2' '$3' '$4' '$5'"
+
+#installkernel '/home/triffid/bin/installkernel' '5.1.7-gentoo-dorellan' 'arch/x86/boot/bzImage' 'System.map' '/boot' ''
+
+KERNELVER="$1"
+KERNELIMG="$2"
+KERNELDEST="$4"
+
+if ! [ -f "$KERNELIMG" ]
+then
+	echo "can't find $KERNELIMG"
+	exit 1
+fi
+
+if [ "$EUID" -ne 0 ]
+then
+	sudo "$0" "$@"
+	exit $?
+fi
+
+if ! mountpoint -q "$KERNELDEST"
+then
+	UNMOUNT=1
+	mount "$KERNELDEST"
+fi
+
+cp -v "$KERNELIMG" "$KERNELDEST/kernel-$KERNELVER"
+
+if [ "$(readlink "$KERNELDEST/new")" != "kernel-$KERNELVER" ]
+then
+	mv -v "$KERNELDEST/new" "$KERNELDEST/old"
+	ln -sv "kernel-$KERNELVER" "$KERNELDEST/new"
+fi
+
+if [ -n "$UNMOUNT" ]
+then
+	umount "$KERNELDEST"
+fi
