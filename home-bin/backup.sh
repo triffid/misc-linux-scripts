@@ -18,3 +18,5 @@ do
     echo "*** $F ***"
     rsync -avhszP --delete --link-dest="../../${PREFIX##*/}1/$F" "$F/" "${REMOTEHOST}:${PREFIX}0/$F"
 done
+
+ssh "$REMOTEHOST" "touch ${PREFIX}0"
