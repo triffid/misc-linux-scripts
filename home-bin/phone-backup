@@ -19,7 +19,7 @@ do
 	then
 		RUN=0
 	else
-		if [ adb devices | grep -q "^$SERIAL" ]
+		if adb devices | grep -q "^$SERIAL"
 		then
 			echo Retrying...
 			sleep 1
