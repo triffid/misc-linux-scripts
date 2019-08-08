@@ -69,3 +69,4 @@ for (@{$data->{drawing}->{board}->{plain}->{circle}}) {
 }
 
 printf "Board Dimension: %gmm x %gmm\n", ($brd_offset[2] - $brd_offset[0]), ($brd_offset[3] - $brd_offset[1]);
+printf "Board Centroid : %gmm x %gmm\n", ($brd_offset[2] + $brd_offset[0]) / 2.0, ($brd_offset[3] + $brd_offset[1]) / 2.0;
