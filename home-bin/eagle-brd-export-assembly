@@ -28,7 +28,7 @@ for l in r.findall('./drawing/board/libraries/'):
 			#print("\t\tPin '%s': %s,%s" % (s.get('name'), s.get('x'), s.get('y')))
 			path = "%s/%s/%s: %s,%s"%(l.get('name'), p.get('name'), s.get('name'), s.get('x'), s.get('y'))
 			#print(path)
-			if (s.get('name') in ('1', 'A', 'P1', '_1', 'S1', '1A', '+')):
+			if (s.get('name') in ('1', 'A', 'P1', '_1', 'S1', '1A', '+', 'G')):
 				footprints["%s/%s"%(l.get('name'), p.get('name'))] = (float(s.get('x')), float(s.get('y')))
 		for s in p.findall('./pad'):
 			#print("\t\tPin '%s': %s,%s" % (s.get('name'), s.get('x'), s.get('y')))

@@ -26,7 +26,7 @@ resultset = {}
 attrs = []
 
 for e in r.findall('./drawing/board/elements/'):
-	if (e.attrib['library'] not in ('testpad',) and e.get('package') not in ('2PT_GND_TIE',)):
+	if (e.attrib['library'] not in ('testpad', 'testpoint') and e.get('package') not in ('2PT_GND_TIE',)):
 		attr_dict = {}
 		attr_str  = ""
 		for a in sorted(e.findall('./'), key=lambda n: str.lower(n.attrib['name'])):
