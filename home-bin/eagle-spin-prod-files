@@ -125,7 +125,7 @@ unoconv -o "${NAMEREV}-BOM.xlsx" "${NAMEREV}-BOM.csv" || exit 1
 
 eagle-brd-export-assembly "${NAMEREV}.brd" > "${NAMEREV}-Assembly.txt"
 
-pdfunite "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf" "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly.pdf" && rm "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf"
+pdfunite "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf" "${NAMEREV}-Assembly.pdf" && rm "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf"
 
 zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly.txt" "${NAMEREV}-Assembly.pdf"
 
