@@ -43,7 +43,7 @@ print()
 rr = re.compile('(M?)R(\d+)')
 
 for e in r.findall('./drawing/board/elements/'):
-	if (e.attrib['library'] not in ('testpad',) and e.get('package') not in ('2PT_GND_TIE',)):
+	if (e.attrib['library'] not in ('testpad','testpoint') and e.get('package') not in ('2PT_GND_TIE',)):
 		pin1 = ""
 		foot = "%s/%s" % (e.get('library'), e.get('package'))
 		if (foot in footprints):
