@@ -75,8 +75,10 @@ O="$NAMEREV"
 rm -rf "$O"
 mkdir "$O"
 
-cp "$SCHEMATIC" "$O/${NAMEREV}.sch"
-cp "$BOARD" "$O/${NAMEREV}.brd"
+# cp "$SCHEMATIC" "$O/${NAMEREV}.sch"
+# cp "$BOARD" "$O/${NAMEREV}.brd"
+perl -pe 's/&gt;REV/'"$REV"'/g' "$SCHEMATIC" > "$O/${NAMEREV}.sch"
+perl -pe 's/&gt;REV/'"$REV"'/g' "$BOARD"     > "$O/${NAMEREV}.brd"
 
 pushd "$O" >/dev/null || exit 1
 
@@ -155,7 +157,7 @@ zip "${NAMEREV}.zip" "$O/${NAMEREV}-Board-Info.txt" "$O/${NAMEREV}-DesignFiles-E
 
 ### Generate Manifest
 
-for Z in {1..4}
+for Z in {1..2}
 do
 	unzip -l "${NAMEREV}.zip" >> "$O/${NAMEREV}-Manifest.txt"
 	zip "${NAMEREV}.zip" "$O/${NAMEREV}-Manifest.txt"
