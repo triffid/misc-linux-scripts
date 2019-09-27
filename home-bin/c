@@ -13,6 +13,9 @@ cat <<'ENDHEAD' > "$TEMP"
 #include <iostream>
 #include <string>
 #include <cstring>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 int main(int argc, char** argv)
 {
