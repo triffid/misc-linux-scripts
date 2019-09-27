@@ -18,7 +18,7 @@ for key in sorted(j[0], key=str.lower):
 	value = j[0][key]
 	if (key != 'info'):
 		host = value.get('dns', None)
-		if host is not None:
+		if host is not None and host not in ('hk', 'turkey'):
 			hostprefix = hostprefixre.match(host).group(1)
 			for ip in resolver.query(host, 'A'):
 				print('\tlocal-data: "' + hostprefix + '.pia IN A ' + str(ip) + '"')
