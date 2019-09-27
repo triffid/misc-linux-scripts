@@ -75,8 +75,6 @@ O="$NAMEREV"
 rm -rf "$O"
 mkdir "$O"
 
-# cp "$SCHEMATIC" "$O/${NAMEREV}.sch"
-# cp "$BOARD" "$O/${NAMEREV}.brd"
 perl -pe 's/&gt;REV/'"$REV"'/g' "$SCHEMATIC" > "$O/${NAMEREV}.sch"
 perl -pe 's/&gt;REV/'"$REV"'/g' "$BOARD"     > "$O/${NAMEREV}.brd"
 
@@ -86,15 +84,22 @@ pushd "$O" >/dev/null || exit 1
 
 zip "${NAMEREV}-DesignFiles-Eagle7.zip" "${NAMEREV}.sch" "${NAMEREV}.brd" || exit 1
 
-wine 'H:\Private\Software\eagle\bin\eaglecon.exe' -N- -C "
-	EDIT .sch; print file ${NAMEREV}-schematic.pdf paper A4 sheets ALL landscape;
-	EDIT .brd; set color_layer dimension 15; set color_layer tPlace 54; set color_layer tDocu 54; set color_layer tNames 7; set color_layer tValues 23; set color_layer tStop 54;
-		display none dimension pads tPlace tDocu tNames tValues tStop; print file ${NAMEREV}-Assembly-TOP.pdf    paper A4 sheets ALL landscape;
-	display all; group all; mirror (>0 0); group;
-		display none dimension pads tPlace tDocu tNames tValues tStop; print file ${NAMEREV}-Assembly-BOTTOM.pdf paper A4 sheets ALL landscape;
-	undo;
+eagle -N- -C "
+	EDIT .sch;
+		print 10 -1 file ${NAMEREV}-schematic.pdf paper A4 sheets ALL landscape -caption -window -black -mirror -rotate -upsidedown;
+	EDIT .brd;
+		set color_layer dimension 15;
+		set color_layer tPlace 54; set color_layer tDocu 54; set color_layer tNames 7; set color_layer tValues 23; set color_layer tStop 54;
+		display none dimension pads tPlace tDocu tNames tValues tStop Measures;
+		print 10 -1 file ${NAMEREV}-Assembly-TOP.pdf    paper A4 sheets ALL landscape -mirror -caption -window -black -rotate -upsidedown;
+		set color_layer bPlace 54; set color_layer bDocu 54; set color_layer bNames 7; set color_layer bValues 23; set color_layer bStop 54;
+		display none dimension pads bPlace bDocu bNames bValues bStop;
+		print 10 -1 file ${NAMEREV}-Assembly-BOTTOM.pdf paper A4 sheets ALL landscape  mirror -caption -window -black -rotate -upsidedown;
 	quit;" \
 	"${NAMEREV}.sch"
+
+pdfunite "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf" "${NAMEREV}-Assembly.pdf" && rm "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf"
+
 
 zip "${NAMEREV}-DesignFiles-Eagle7.zip" "${NAMEREV}-schematic.pdf" || exit 1
 
@@ -126,8 +131,6 @@ unoconv -o "${NAMEREV}-BOM.xlsx" "${NAMEREV}-BOM.csv" || exit 1
 ### Assembly
 
 eagle-brd-export-assembly "${NAMEREV}.brd" > "${NAMEREV}-Assembly.txt"
-
-pdfunite "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf" "${NAMEREV}-Assembly.pdf" && rm "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf"
 
 zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly.txt" "${NAMEREV}-Assembly.pdf"
 
