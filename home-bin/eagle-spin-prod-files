@@ -5,7 +5,9 @@ errormsg () {
 	echo
 	echo "Usage: $0 [-n] [-c|--cam cam-job-file] <revision> [file.sch]"
 	echo
-	echo $'\t-n\t'"Don't delete temporary working directory after successful completion."
+	echo $'\t-d\t'"Delete temporary working directory after successful completion."
+	echo
+	echo $'\t-c\t'"Use a specific CAM job rather than the auto-detected one."
 	echo
 	echo $'\t'"revision: The revision name to use when generating output files."
 	echo
@@ -16,11 +18,18 @@ errormsg () {
 	exit 1
 }
 
+# default don't delete
+NODELETE=1
+
 while [[ "$1" =~ ^- ]]
 do
 	case "$1" in
 		-n|--nodelete)
 			NODELETE=1
+			shift
+			;;
+		-d|--delete)
+			unset NODELETE
 			shift
 			;;
 		-c|--cam)
