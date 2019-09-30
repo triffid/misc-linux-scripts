@@ -126,7 +126,7 @@ rm *dri *gpi
 
 zip "${NAMEREV}-GERBERS_AND_STENCIL.zip" "${NAMEREV}_"* || exit 1
 
-brd2scad "${NAMEREV}.brd"
+brd2scad "${NAMEREV}.brd" #brd2scad needs gerbers, so we must do this before nuking them
 
 rm "${NAMEREV}_"*
 
@@ -159,13 +159,31 @@ done
 	echo "Revision:        $REV"
 ) > "${NAMEREV}-Board-Info.txt"
 
+### 3D preview
+
+declare -a DIMENSION
+readarray -t -d\  DIMENSION < <(echo -n $(eagle-brd-dimension -p "${NAMEREV}.brd"))
+
+echo "Dimension: ${DIMENSION[@]}"
+
+ROT=0
+if [[ "${DIMENSION[0]}" -lt "${DIMENSION[1]}" ]]
+then
+	ROT=90
+fi
+
+echo /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,15,0,$(( $ROT + 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-TOP.png" "${NAMEREV}.scad"
+/usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,15,0,$(( $ROT + 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-TOP.png" "${NAMEREV}.scad"
+echo /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,195,0,$(( $ROT - 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-BOTTOM.png" "${NAMEREV}.scad"
+/usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,195,0,$(( $ROT - 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-BOTTOM.png" "${NAMEREV}.scad"
+
 ### Construct production zip
 
 popd >/dev/null
 
 rm -f "${NAMEREV}.zip"
 
-zip "${NAMEREV}.zip" "$O/${NAMEREV}-Board-Info.txt" "$O/${NAMEREV}-DesignFiles-Eagle7.zip" "$O/${NAMEREV}-schematic.pdf" "$O/${NAMEREV}-GERBERS_AND_STENCIL.zip" "$O/${NAMEREV}-Assembly.zip" "$O/${NAMEREV}-BOM.xlsx" "$O/${NAMEREV}-Manifest.txt"
+zip "${NAMEREV}.zip" "$O/${NAMEREV}-Board-Info.txt" "$O/${NAMEREV}-DesignFiles-Eagle7.zip" "$O/${NAMEREV}-schematic.pdf" "$O/${NAMEREV}-GERBERS_AND_STENCIL.zip" "$O/${NAMEREV}-Assembly.zip" "$O/${NAMEREV}-BOM.xlsx" "$O/${NAMEREV}-Manifest.txt" "$O/${NAMEREV}.scad" "$O/${NAMEREV}-3D-TOP.png" "$O/${NAMEREV}-3D-BOTTOM.png"
 
 ### Generate Manifest
 
@@ -174,8 +192,6 @@ do
 	unzip -l "${NAMEREV}.zip" >> "$O/${NAMEREV}-Manifest.txt"
 	zip "${NAMEREV}.zip" "$O/${NAMEREV}-Manifest.txt"
 done
-
-mv "$O/${NAMEREV}.scad" ./
 
 ### Notify completion
 
