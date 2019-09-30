@@ -118,10 +118,10 @@ LAYERS=$(eagle-brd-export-layercount "${NAMEREV}.brd")
 
 if [ -z "$CAMFILE" ]
 then
-	CAMFILE="$HOME/eagle/eagle-7_${LAYERS}layer.cam"
+	CAMFILE="/home/triffid/eagle/eagle-7_${LAYERS}layer.cam"
 fi
 
-Cam2Gerber.py -b "${NAMEREV}.brd" -c "$CAMFILE" || exit 1
+Cam2Gerber.py -b "${NAMEREV}.brd" -c "$CAMFILE" -e "$(which eagle)" || exit 1
 rm *dri *gpi
 
 zip "${NAMEREV}-GERBERS_AND_STENCIL.zip" "${NAMEREV}_"* || exit 1
@@ -177,13 +177,15 @@ echo /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSI
 echo /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,195,0,$(( $ROT - 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-BOTTOM.png" "${NAMEREV}.scad"
 /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,195,0,$(( $ROT - 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-BOTTOM.png" "${NAMEREV}.scad"
 
+/usr/bin/openscad -o "${NAMEREV}.csg" "${NAMEREV}.scad" && gzip < "${NAMEREV}.csg" > "${NAMEREV}.csg.gz" && rm "${NAMEREV}.csg"
+
 ### Construct production zip
 
 popd >/dev/null
 
 rm -f "${NAMEREV}.zip"
 
-zip "${NAMEREV}.zip" "$O/${NAMEREV}-Board-Info.txt" "$O/${NAMEREV}-DesignFiles-Eagle7.zip" "$O/${NAMEREV}-schematic.pdf" "$O/${NAMEREV}-GERBERS_AND_STENCIL.zip" "$O/${NAMEREV}-Assembly.zip" "$O/${NAMEREV}-BOM.xlsx" "$O/${NAMEREV}-Manifest.txt" "$O/${NAMEREV}.scad" "$O/${NAMEREV}-3D-TOP.png" "$O/${NAMEREV}-3D-BOTTOM.png"
+zip "${NAMEREV}.zip" "$O/${NAMEREV}-Board-Info.txt" "$O/${NAMEREV}-DesignFiles-Eagle7.zip" "$O/${NAMEREV}-schematic.pdf" "$O/${NAMEREV}-GERBERS_AND_STENCIL.zip" "$O/${NAMEREV}-Assembly.zip" "$O/${NAMEREV}-BOM.xlsx" "$O/${NAMEREV}-Manifest.txt" "$O/${NAMEREV}.csg.gz" "$O/${NAMEREV}-3D-TOP.png" "$O/${NAMEREV}-3D-BOTTOM.png"
 
 ### Generate Manifest
 
