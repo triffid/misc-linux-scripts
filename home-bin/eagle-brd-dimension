@@ -22,8 +22,16 @@ use strict;
 use XML::Simple;
 use Data::Dumper;
 
+my $plain = 0;
+
+if ($ARGV[0] eq "-p") {
+	$plain = 1;
+	shift;
+}
+
 if (@ARGV < 1) {
-	print "Usage: eagle-brd-dimension <file.brd>\n";
+	print "Usage: eagle-brd-dimension [-p] <file.brd>\n";
+	print "\t-p: plain computer-readable output instead of human-readable\n";
 	exit 0;
 }
 
@@ -68,5 +76,21 @@ for (@{$data->{drawing}->{board}->{plain}->{circle}}) {
 	}
 }
 
-printf "Board Dimension: %gmm x %gmm\n", ($brd_offset[2] - $brd_offset[0]), ($brd_offset[3] - $brd_offset[1]);
-printf "Board Centroid : %gmm x %gmm\n", ($brd_offset[2] + $brd_offset[0]) / 2.0, ($brd_offset[3] + $brd_offset[1]) / 2.0;
+my ($dx, $dy, $cx, $cy) = (
+	($brd_offset[2] - $brd_offset[0]),
+	($brd_offset[3] - $brd_offset[1]),
+	($brd_offset[2] + $brd_offset[0]) / 2.0,
+	($brd_offset[3] + $brd_offset[1]) / 2.0,
+);
+
+if ($plain) {
+	my $diagonal = (($dx ** 2) + ($dy ** 2)) ** 0.5;
+
+	printf "%g %g ", $dx, $dy;
+	printf "%g %g ", $cx, $cy;
+	printf "%g", $diagonal;
+}
+else {
+	printf "Board Dimension: %gmm x %gmm\n", $dx, $dy;
+	printf "Board Centroid : %gmm x %gmm\n", $cx, $cy;
+}
