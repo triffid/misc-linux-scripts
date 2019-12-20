@@ -10,12 +10,14 @@ cat <<'ENDHEAD' > "$TEMP"
 #include <unistd.h>
 #include <math.h>
 #include <arpa/inet.h>
-#include <iostream>
-#include <string>
-#include <cstring>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+#include <iostream>
+#include <string>
+#include <cstring>
+#include <functional>
 
 int main(int argc, char** argv)
 {
@@ -44,6 +46,11 @@ cat <<'ENDTAIL' >> "$TEMP"
 }
 ENDTAIL
 
-g++ "${CFLAGS[@]}" -o "${TEMP%%.c}" "$TEMP" -lm && "${TEMP%%.c}"
+g++ "${CFLAGS[@]}" -o "${TEMP%%.c}" "$TEMP" -lm || exit 1
+
+"${TEMP%%.c}"
+EXITCODE=$?
 
 rm -f "$TEMP" "${TEMP%%.c}"
+
+exit $EXITCODE
