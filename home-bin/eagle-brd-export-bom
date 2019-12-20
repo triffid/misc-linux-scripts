@@ -35,10 +35,13 @@ for e in r.findall('./drawing/board/elements/'):
 				attr_str += "%s:%s\t" % (a.attrib['name'], a.attrib['value'])
 				if (attrs.count(a.attrib['name']) == 0):
 					attrs += [a.attrib['name']]
-		key = ':'.join([e.attrib['package'], e.attrib['value'], attr_str]);
+		key = ':'.join([e.attrib['package'], e.attrib['value'], attr_str])
 		#pprint(e.attrib)
 		if (key not in resultset):
-			resultset[key] = [e.attrib['value'], e.attrib['package'], descriptions.get("%s/%s" % (e.get('library'), e.get('package')), ''), attr_dict, [e.attrib['name']]]
+			descr = descriptions.get("%s/%s" % (e.get('library'), e.get('package')), '')
+			if (e.get('description') is not None):
+				descr = e.get('description')
+			resultset[key] = [e.attrib['value'], e.attrib['package'], descr, attr_dict, [e.attrib['name']]]
 		else:
 			resultset[key][4] += [e.attrib['name']]
 
