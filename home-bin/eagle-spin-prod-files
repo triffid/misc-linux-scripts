@@ -97,13 +97,19 @@ eagle -N- -C "
 	EDIT .sch;
 		print 10 -1 file ${NAMEREV}-schematic.pdf paper A4 sheets ALL landscape -caption -window -black -mirror -rotate -upsidedown;
 	EDIT .brd;
+		display none tNames tValues tPlace tDocu bNames bValues bPlace bDocu;
+		group all;
+		change font proportional (>0 0);
+		group;
+		set palette 55 0x80808080;
 		set color_layer dimension 15;
-		set color_layer tPlace 54; set color_layer tDocu 54; set color_layer tNames 7; set color_layer tValues 23; set color_layer tStop 54;
+		set color_layer tPlace 54; set color_layer tDocu 54; set color_layer tNames 7; set color_layer tValues 23; set color_layer tStop 55; set fill_layer tStop 11;
 		display none dimension pads tPlace tDocu tNames tValues tStop Measures;
 		print 10 -1 file ${NAMEREV}-Assembly-TOP.pdf    paper A4 sheets ALL landscape -mirror -caption -window -black -rotate -upsidedown;
-		set color_layer bPlace 54; set color_layer bDocu 54; set color_layer bNames 7; set color_layer bValues 23; set color_layer bStop 54;
+		set color_layer bPlace 54; set color_layer bDocu 54; set color_layer bNames 7; set color_layer bValues 23; set color_layer bStop 55; set fill_layer bStop 12;
 		display none dimension pads bPlace bDocu bNames bValues bStop;
 		print 10 -1 file ${NAMEREV}-Assembly-BOTTOM.pdf paper A4 sheets ALL landscape  mirror -caption -window -black -rotate -upsidedown;
+	set confirm no;
 	quit;" \
 	"${NAMEREV}.sch"
 
@@ -167,7 +173,8 @@ readarray -t -d\  DIMENSION < <(echo -n $(eagle-brd-dimension -p "${NAMEREV}.brd
 echo "Dimension: ${DIMENSION[@]}"
 
 ROT=0
-if [[ "${DIMENSION[0]}" -lt "${DIMENSION[1]}" ]]
+# if [[ "${DIMENSION[0]}" -lt "${DIMENSION[1]}" ]]
+if perl -e "exit 1 if ${DIMENSION[0]} >= ${DIMENSION[1]};"
 then
 	ROT=90
 fi
