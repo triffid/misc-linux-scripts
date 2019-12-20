@@ -124,7 +124,7 @@ LAYERS=$(eagle-brd-export-layercount "${NAMEREV}.brd")
 
 if [ -z "$CAMFILE" ]
 then
-	CAMFILE="/home/triffid/eagle/eagle-7_${LAYERS}layer.cam"
+	CAMFILE="$HOME/eagle/eagle-7_${LAYERS}layer.cam"
 fi
 
 Cam2Gerber.py -b "${NAMEREV}.brd" -c "$CAMFILE" -e "$(which eagle)" || exit 1
