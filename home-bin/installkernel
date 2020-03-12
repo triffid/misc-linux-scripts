@@ -2,6 +2,8 @@
 
 set -e
 
+unset UNMOUNT
+
 logger -t installkernel "installkernel '$0' '$1' '$2' '$3' '$4' '$5'"
 
 #installkernel '/home/triffid/bin/installkernel' '5.1.7-gentoo-dorellan' 'arch/x86/boot/bzImage' 'System.map' '/boot' ''
@@ -22,21 +24,37 @@ then
 	exit $?
 fi
 
+echo "*** Installing Modules"
+make modules_install || exit 1
+
+echo -n "*** Checking $KERNELDEST... "
 if ! mountpoint -q "$KERNELDEST"
 then
 	UNMOUNT=1
-	mount "$KERNELDEST"
+	echo
+	echo -n "*** Mounting $KERNELDEST... "
+	mount "$KERNELDEST" || exit 1
 fi
+echo "OK"
 
-cp -v "$KERNELIMG" "$KERNELDEST/kernel-$KERNELVER"
+echo -n "*** Copying $KERNELIMG -> $KERNELDEST/kernel-$KERNELVER... "
+cp "$KERNELIMG" "$KERNELDEST/kernel-$KERNELVER" || exit 1
+echo "OK"
 
 if [ "$(readlink "$KERNELDEST/new")" != "kernel-$KERNELVER" ]
 then
-	mv -v "$KERNELDEST/new" "$KERNELDEST/old"
-	ln -sv "kernel-$KERNELVER" "$KERNELDEST/new"
+	echo -n "*** Updating Links... "
+	mv -v "$KERNELDEST/new" "$KERNELDEST/old" || exit 1
+	ln -sv "kernel-$KERNELVER" "$KERNELDEST/new" || exit 1
+	echo "OK"
 fi
 
 if [ -n "$UNMOUNT" ]
 then
-	umount "$KERNELDEST"
+	echo -n "*** Unmounting $KERNELDEST... "
+	umount "$KERNELDEST" || exit 1
+	echo "OK"
 fi
+
+echo
+echo "Finished."
