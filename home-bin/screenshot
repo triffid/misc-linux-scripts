@@ -4,6 +4,26 @@ DATETIME=$(date +%Y%m%d-%H%M%S)
 DATE=$(echo $DATETIME | cut -d- -f1)
 
 mkdir -p ~/Screenshots/$DATE && ln -nfs ~/Screenshots/$DATE ~/Screenshots/latest
-import -window root ~/Screenshots/$DATE/screenshot-$DATETIME.png
 
-mpv /usr/share/sounds/pop.wav
+FILE="$HOME/Screenshots/$DATE/screenshot-$DATETIME.png"
+TRIES=0
+while [ $TRIES -le 10 ] && ! [ -e "$FILE" ]
+do
+	import -window root "$FILE"
+	if [ $(stat -c %s "$FILE") -lt 65536 ]
+	then
+		echo "Failed! Retrying"
+		rm "$FILE"
+	fi
+	TRIES=$(( $TRIES + 1 ))
+done
+
+if [ $TRIES -ge 10 ]
+then
+	echo "Failed! Giving up"
+	exit 1
+else
+	echo "Succeeded"
+fi
+
+# mpv /usr/share/sounds/pop.wav
