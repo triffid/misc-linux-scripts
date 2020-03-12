@@ -14,8 +14,6 @@ if (len(sys.argv) < 2):
 
 parts = sys.argv[2:]
 
-#pprint(parts)
-
 e = ElementTree.parse(sys.argv[1])
 r = e.getroot()
 
@@ -24,7 +22,7 @@ footprints = {}
 rr = re.compile(r'.*?([A-Za-z][A-Za-z0-9_-]*)$')
 unn = re.compile(r'N\$\d+|VCC|GND')
 
-for net in r.findall('./drawing/schematic/sheets/sheet/nets/'):
+for net in (r.findall('./drawing/schematic/sheets/sheet/nets/') + r.findall('./drawing/schematic/modules/module/sheets/sheet/nets/')):
 	netname = net.get('name')
 	if (unn.search(netname) is None):
 		safenetname = re.sub(r'\!', 'n', netname)
@@ -40,6 +38,9 @@ for net in r.findall('./drawing/schematic/sheets/sheet/nets/'):
 					#if (rematch is not None):
 						#pinname = rematch.groups()[0]
 					pinname = re.sub(r'\!', 'n', pin)
+					pinname = re.sub(r'\W.*', '', pinname)
 					pinname = re.sub(r'\W', 'x', pinname)
 					if (unn.search(pinname) is None):
 						print("#define PIN_%-16s %s" % (part + "_" + safenetname, pinname))
+
+# eagle-sch-pinout LS_Control.sch U1 | sed -e "$( ( PRINT=0; while read -u 3; do echo "$REPLY" | grep -q digital_pin_to_port_PGM && PRINT=1; if [[ $PRINT -ge 1 ]]; then echo "$REPLY" | perl -ne '/^.*(P[A-Z]) ([0-9]) \*\* (\d+)/ && print "s/$1$2\$/$3 \\/\\/ arduino pin number $3/;";'; fi; echo "$REPLY" | grep -q '^}' && PRINT=0; done; echo ) 3</usr/share/arduino/hardware/arduino/avr/variants/mega/pins_arduino.h)" | perl -pe 's/(P[A-Z][0-9])$/$1 \/\/no arduino pin number available, use port I\/O/;'
