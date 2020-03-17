@@ -1,0 +1,28 @@
+#!/bin/bash
+
+error() {
+	echo "\"$TEMP\": invalid temperature. Expected integer between 25 and 110"
+	exit 1	
+}
+
+TEMP="$1"
+
+if [ -z "$TEMP" ]
+then
+	TEMP=85
+fi
+
+if ! [[ "$TEMP" =~ [0-9]+ ]]
+then
+	error
+fi
+
+if [[ "$TEMP" -gt 110 ]] || [[ "$TEMP" -lt 25 ]]
+then
+	error
+fi
+
+dbus-send --system --dest=org.freedesktop.thermald /org/freedesktop/thermald org.freedesktop.thermald.SetUserPassiveTemperature string:cpu uint32:$(( TEMP * 1000 ))
+
+echo "Thermal throttle set to ${TEMP}°C"
+exit 0
