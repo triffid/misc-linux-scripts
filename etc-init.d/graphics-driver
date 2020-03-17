@@ -14,7 +14,7 @@
 
 extra_commands="save restore"
 
-CURRENTVER=$(cd /var/db/pkg/x11-drivers/; echo nvidia-drivers-*)
+CURRENTVER=$(cd /var/db/pkg/x11-drivers/; echo nvidia-drivers-* | sed -E 's/\-r[0-9]+$//')
 KERNELVER=$(< /sys/module/nvidia/version)
 
 depend() {
@@ -29,7 +29,7 @@ restore() {
 	fi
 	if [ ! -d "/var/db/pkg/x11-drivers/nvidia-drivers-${KERNELVER}" ]
 	then
-		emerge -Ku1Oq "=x11-drivers/nvidia-drivers-${KERNELVER}"
+		emerge -Ku1Oq "~x11-drivers/nvidia-drivers-${KERNELVER}"
 	fi
 }
 
