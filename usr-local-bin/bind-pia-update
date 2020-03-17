@@ -1,0 +1,11 @@
+#!/bin/bash
+
+ZONEFILE="/etc/bind/pri/pia.zone"
+
+pia-to-bind.py > "$ZONEFILE".new || exit 1
+
+if [ $(wc -l "$ZONEFILE".new | cut -d\  -f1) -ge 200 ]
+then
+	mv "$ZONEFILE".new "$ZONEFILE"
+	rndc reload pia &>/dev/null
+fi
