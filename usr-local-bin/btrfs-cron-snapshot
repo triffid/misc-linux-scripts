@@ -1,0 +1,38 @@
+#!/bin/bash
+
+SNAPSHOT_PATHS="${SNAPSHOT_PATHS:-/}"
+SNAPSHOT_HOME="${SNAPSHOT_HOME:-/snapshots}"
+RETAIN_DAYS="${RETAIN_DAYS:-14}"
+
+# ---------------------------
+
+PATH="$PATH:/sbin:/usr/sbin:/usr/local/sbin:/bin:/usr/bin:/usr/local/bin"
+
+shopt -s nullglob
+
+if [ -z "$NOW" ]
+then
+	NOW=$(date +%s)
+fi
+TODAY=$(date -d "@$NOW" +%Y%m%d)
+
+for SNAP_PATH in $SNAPSHOT_PATHS
+do
+	NAME="${SNAP_PATH//\//_}"
+	NAME="${NAME#_}"
+	NAME="$SNAPSHOT_HOME/${NAME:-root}-$TODAY"
+	if ! [ -e "$NAME" ]
+	then
+		btrfs subvolume snapshot -r "$SNAP_PATH" "$NAME"
+	fi
+done
+
+EXPIRE_SECONDS=$(( $NOW - $(( $RETAIN_DAYS * 86400 )) ))
+
+for F in $SNAPSHOT_HOME/*
+do
+	if [ $(( $(date -d "$(btrfs subvolume show $F | grep Creation | cut -d: -f2-)" +%s) )) -le $EXPIRE_SECONDS ]
+	then
+		btrfs subvolume delete "$F"
+	fi
+done
