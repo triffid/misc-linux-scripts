@@ -17,7 +17,7 @@ def getbest(es, r1dec, r2dec):
 			r.append([r1 * r1dec, r2 * r2dec, getvo(r1 * r1dec, r2 * r2dec)])
 	return r
 
-def sisuf(val):
+def siprefix(val):
 	gr = min(max(int(floor(log10(val) / 3)), -8), 8)
 	return "%1.2f%s"%(val / (10 ** (3 * gr)), (gr != 0 and "yzafpnum_kMGTPEZY"[gr + 8]) or "")
 
@@ -83,5 +83,5 @@ for i in range(args.results):
 	erro = (vo - vout) * 100 / vout
 	vi = vout / rat
 	erri = (vi - vin) * 100 / vin
-	print("\tR1 = %sΩ\tR2 = %sΩ\n\t\tVin  %sv -> Vout %sv (%sv %+2.1f%%)\n\t\tVout %sv -> Vin  %sv (%sv %+2.1f%%)"%(sisuf(r1), sisuf(r2), sisuf(vin), sisuf(vo), sisuf(vout), erro, sisuf(vout), sisuf(vout / rat), sisuf(vin), erri))
-	print("\t\tThevenin Impedance: %sΩ\tCurrent: %sA\tPower: %sW"%(sisuf(thev), sisuf(curr), sisuf(powr)))
+	print("\tR1 = %sΩ\tR2 = %sΩ\n\t\tVin  %sv -> Vout %sv (%sv %+2.1f%%)\n\t\tVout %sv -> Vin  %sv (%sv %+2.1f%%)"%(siprefix(r1), siprefix(r2), siprefix(vin), siprefix(vo), siprefix(vout), erro, siprefix(vout), siprefix(vout / rat), siprefix(vin), erri))
+	print("\t\tThevenin Impedance: %sΩ\tCurrent: %sA\tPower: %sW"%(siprefix(thev), siprefix(curr), siprefix(powr)))
