@@ -4,4 +4,4 @@ DOWNLOAD_LOG='tail -n8192 /var/log/emerge-fetch.log | grep "^>>>" | tail -n1; ec
 CURRENT_LOG='genlop -cn; echo;'
 HISTORY_LOG='tail -n10 /var/log/emerge.log | perl -pe "s/^(\d+)/localtime \$1/e"; echo; '
 
-watch -ptn 0.25 "$DOWNLOAD_LOG $HISTORY_LOG $CURRENT_LOG"
+nice ionice -c 3 watch -ptn 0.25 "$DOWNLOAD_LOG $HISTORY_LOG $CURRENT_LOG"
