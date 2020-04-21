@@ -2,7 +2,7 @@
 
 SNAPSHOT_PATHS="${SNAPSHOT_PATHS:-/}"
 SNAPSHOT_HOME="${SNAPSHOT_HOME:-/snapshots}"
-RETAIN_DAYS="${RETAIN_DAYS:-14}"
+RETAIN_DAYS="${RETAIN_DAYS:-3}"
 
 # ---------------------------
 
