@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+# set -e
 
 unset UNMOUNT
 
@@ -31,11 +31,22 @@ echo -n "*** Checking $KERNELDEST... "
 if ! mountpoint -q "$KERNELDEST"
 then
 	UNMOUNT=1
-	echo
-	echo -n "*** Mounting $KERNELDEST... "
+	echo -n $'\e[1K\e[0G'"*** Mounting $KERNELDEST... "
 	mount "$KERNELDEST" || exit 1
 fi
 echo "OK"
+
+if [ -d /boot/EFI ]
+then
+	echo -n "*** Checking /boot/EFI... "
+	if ! mountpoint -q "/boot/EFI"
+	then
+		UNMOUNT=1
+		echo -n $'\e[1K\e[0G'"*** Mounting /boot/EFI... "
+		mount "/boot/EFI" || exit 1
+	fi
+	echo "OK"
+fi
 
 echo -n "*** Copying $KERNELIMG -> $KERNELDEST/kernel-$KERNELVER... "
 cp "$KERNELIMG" "$KERNELDEST/kernel-$KERNELVER" || exit 1
@@ -49,8 +60,24 @@ then
 	echo "OK"
 fi
 
+if [ -d /boot/EFI/EFI/linux ]
+then
+	echo -n "*** Copying $KERNELIMG -> /boot/EFI/EFI/linux/linux.efi... "
+	cp "$KERNELIMG" "/boot/EFI/EFI/linux/linux.efi" || exit 1
+	echo "OK"
+fi
+
+echo -n "*** Setting linux.efi as next boot... "
+efibootmgr -n $(efibootmgr -v | grep linux.efi | cut -b5-8)
+echo "OK"
+
 if [ -n "$UNMOUNT" ]
 then
+	if mountpoint -q "/boot/EFI"
+	then
+		echo -n "*** Unmounting /boot/EFI... "
+		umount "/boot/EFI" && echo "OK" || echo "Failed"
+	fi
 	echo -n "*** Unmounting $KERNELDEST... "
 	umount "$KERNELDEST" || exit 1
 	echo "OK"
