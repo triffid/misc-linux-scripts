@@ -1,0 +1,129 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use CGI;
+use CGI::Carp qw(fatalsToBrowser);
+use File::Temp;
+use File::Copy qw(move);
+
+use Data::Dumper;
+use File::MimeInfo;
+use File::Find;
+
+$CGI::POST_MAX = 102_476_800; # max 100MB
+
+my $q = new CGI;
+
+if ($ENV{REQUEST_METHOD} eq "GET") {
+	my $job = $q->param('job');
+	if ($job =~ /^([0-9a-zA-Z_\-]{8})$/) {
+		$job = $1;
+		if (-d "/tmp/apache-eagle-$job") {
+			my $dir = "/tmp/apache-eagle-$job";
+			if ($q->param('file')) {
+				my $file = $q->param('file');
+				die "bad filename" if $file =~ /\.\./;
+
+				$file = "$dir/$file";
+				die "bad filename" if ! -e $file;
+				
+				open(my $f, '<', $file) || die $!;
+				
+				print $q->header(-type => mimetype($file), -charset => 'utf8', -length => -s $file);
+				binmode STDOUT;
+				binmode $f;
+				my $buf;
+				print $buf while read $f, $buf, 65536;
+				exit 0;
+			}
+			elsif ($q->param('log')) {
+				print $q->header(-type => 'text/plain', -charset => 'utf8');
+				system('tail', "$dir/log");
+				exit 0;
+			}
+			elsif (-e "$dir/complete") {
+				print $q->header(-type => 'text/html', -charset => 'utf8');
+				print "<html5>\n<html><head><title>Job $job Complete!</title></head><body><h1>Job $job Complete!</h1><br/>\n";
+
+				find(sub{
+					-f $File::Find::name && $File::Find::name =~ /^$dir\/(.*TOP.png)$/ && print '<img src="eagle-spin-prod-files?job='.$job.'&file='.$1.'" style="width: 45%; float: left;" />'."\n";
+				}, $dir);
+				find(sub{
+					-f $File::Find::name && $File::Find::name =~ /^$dir\/(.*BOTTOM.png)$/ && print '<img src="eagle-spin-prod-files?job='.$job.'&file='.$1.'" style="width: 45%; float: left;"/><br style="clear: both;"/>'."\n";
+				}, $dir);
+
+				find(sub{
+					-f $File::Find::name && $_ !~ /^complete$/ && $File::Find::name =~ /^$dir\/(.*)$/ && print '<a href="eagle-spin-prod-files?job='.$job.'&file='.$1.'">'.$1.'</a><br />'."\n";
+				}, $dir);
+
+				print '</body></html>';
+			}
+			else {
+				print $q->header(-type => 'text/html', -charset => 'utf8');
+				print '<html><head><meta http-equiv="refresh" content="2; eagle-spin-prod-files?job='.$job.'"></head><body><h1>Job '.$job.' Processing...</h1><br>'."\n";
+				if (-f "$dir/log") {
+					print '<iframe width="80%" height="200em" src="eagle-spin-prod-files?job='.$job.'&log=1"></iframe><br />';
+				}
+				find(sub{
+					-f $File::Find::name && $_ !~ /^complete$/ && $File::Find::name =~ /^$dir\/(.*)$/ && print $1."<br />\n";
+				}, $dir);
+				print '</body></html>';
+			}
+		}
+		else {
+			print $q->header(-type => 'text/html', -charset => 'utf8', -status => '401 Job Not Found');
+			print "<html5>\n<html><head><title>Job $job Not Found</title><meta http-equiv=\"refresh\" content=\"5; eagle-spin-prod-files\"></head><body><h1>Job $job Not Found</h1><br />Returning to start</body></html>";
+			exit 0;
+		}
+	}
+	elsif ($job =~ /^$/) {
+		# no job specified, show upload form
+		print $q->header(-type => 'text/html', -charset => 'utf8');
+		print "<html5>\n<html><head><title>Eagle Spin Prod Files</title></head><body><h1>Eagle Spin Prod Files - Add Job</h1><br />";
+		print '<form action="eagle-spin-prod-files" method="post" enctype="multipart/form-data">';
+		print '<label id="rev-label">Revision name:</label><input type="text" name="rev" /><br />';
+		print '<label id="sch-label">Schematic (.sch):</label><input type="file" label="sch-label" name="sch" /><br />';
+		print '<label id="brd-label">Board (.brd):</label><input type="file" label="brd-label" name="brd" /><br />';
+		print '<input type="submit" value="Go" /><br />';
+		print '</form>';
+		print "</body></html>";
+	}
+	else {
+		# bad job ID
+		print $q->header(-type => 'text/html', -charset => 'utf8', -status => '401 Bad Job ID');
+		$job =~ s/\</&lt;/g; $job =~ s/\>/&gt;/g;
+		print "<html5>\n<html><head><title>Bad Job ID $job</title><meta http-equiv=\"refresh\" content=\"5; eagle-spin-prod-files\"></head><body><h1>Job $job Not Found</h1><br />Returning to start</body></html>";
+		exit 0;
+	}
+}
+elsif ($ENV{REQUEST_METHOD} eq "POST") {
+	my $sch = $q->upload('sch');
+	die "No schematic" unless $sch;
+
+	my $brd = $q->upload('brd');
+	die "No board" unless $brd;
+
+	die "No revision" unless $q->param('rev');
+	die "Bad revision" unless $q->param('rev') =~ /^[0-9a-zA-Z_\-]+$/;
+
+	my $tmpdir = File::Temp->newdir("/tmp/apache-eagle-XXXXXXXX", CLEANUP => 0);
+	die "Couldn't create tmpdir" unless $tmpdir;
+
+	move($q->tmpFileName($sch), $tmpdir->dirname."/".$q->param('sch')) or die $!;
+	move($q->tmpFileName($brd), $tmpdir->dirname."/".$q->param('brd')) or die $!;
+
+	my ($login,$pass,$uid,$gid) = getpwnam('triffid');
+
+	chmod 0770, $tmpdir->dirname or die $!;
+	chmod 0660, $tmpdir->dirname."/".$q->param('sch'), $tmpdir->dirname."/".$q->param('brd') or die $!;
+
+	open(F, '>', '/tmp/eagle-job-daemon') or die $!;
+	print F $tmpdir->dirname . " " . $q->param('rev') . "\n";
+	close F;
+
+	my $job = $tmpdir->dirname;
+	$job =~ s/.*\-//;
+
+	print $q->redirect("eagle-spin-prod-files?job=$job");
+}
