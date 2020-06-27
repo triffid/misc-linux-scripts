@@ -1,0 +1,34 @@
+#!/bin/bash
+
+if [ -n "$1" ]
+then
+	LIST=""
+	while [ -n "$1" ]
+	do
+		U="$1"
+		if [ -r "$U" ]
+		then
+			U=$( \
+				realpath "$U" \
+				| sed -e 's!^/mnt/storage!http://'"${HOSTNAME}"'.local!' \
+				| perl -pe 's/([\[\]\(\) ])/sprintf "%%%02X", ord($1)/ge' \
+			)
+		fi
+		if [[ "$U" =~ ^/mnt/storage ]] || [[ "$U" =~ ^https?:// ]]
+		then
+			if [ -n "$LIST" ]
+			then
+				LIST="$LIST, "
+			fi
+			LIST="$LIST{ \"file\": \"$U\" }"
+		else
+			echo "$1 ($U) not in appropriate location, skipping"
+		fi
+		shift
+	done
+	jq . <<< '{ "id": 1, "jsonrpc": "2.0", "method": "Playlist.Add", "params": {"playlistid": 1, "item": ['"$LIST"'] } }'
+	#curl --header 'Content-Type: application/json' --data-binary '{ "id": 1, "jsonrpc": "2.0", "method": "Playlist.Add", "params": {"playlistid": 1, "item": ['"$LIST"'] } }' jeanelle.local:8080/jsonrpc; echo
+else
+	echo "Usage: kodi-play <files or URLs>"
+	exit 1
+fi
