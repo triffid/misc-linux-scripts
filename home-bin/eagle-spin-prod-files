@@ -180,9 +180,9 @@ then
 fi
 
 echo /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,15,0,$(( $ROT + 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-TOP.png" "${NAMEREV}.scad"
-/usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,15,0,$(( $ROT + 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-TOP.png" "${NAMEREV}.scad"
+/usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,15,0,$(( $ROT + 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-TOP.png" "${NAMEREV}.scad" 2>&1 | grep -v '^Trimming cache:'
 echo /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,195,0,$(( $ROT - 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-BOTTOM.png" "${NAMEREV}.scad"
-/usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,195,0,$(( $ROT - 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-BOTTOM.png" "${NAMEREV}.scad"
+/usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,195,0,$(( $ROT - 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-BOTTOM.png" "${NAMEREV}.scad" 2>&1 | grep -v '^Trimming cache:'
 
 /usr/bin/openscad -o "${NAMEREV}.csg" "${NAMEREV}.scad" && gzip < "${NAMEREV}.csg" > "${NAMEREV}.csg.gz" && rm "${NAMEREV}.csg"
 
