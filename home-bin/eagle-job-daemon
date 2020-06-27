@@ -1,0 +1,63 @@
+#!/bin/bash
+
+FIFO=/tmp/eagle-job-daemon
+
+rm -f "$FIFO"
+
+mkfifo -m 0660 "$FIFO" || exit 1
+
+chgrp apache "$FIFO"
+
+(
+	while read -u 3 -a RARR
+	do
+		echo "'${RARR[0]}' '${RARR[1]}'"
+
+		OK=1
+
+		if ! [[ "${RARR[0]}" =~ ^/tmp/apache-eagle-.{8}$ ]]
+		then
+			ERROR="bad match"
+			OK=0
+		fi
+
+		if [ -z "${RARR[1]}" ]
+		then
+			ERROR="no revision specified"
+			OK=0
+		fi
+
+		if ! [[ "${RARR[1]}" =~ ^[0-9a-zA-Z_\-]+$ ]]
+		then
+			ERROR="bad revision"
+			OK=0
+		fi
+
+		if ! [ -d "${RARR[0]}" ]
+		then
+			ERROR="not a dir"
+			OK=0
+		fi
+
+		if [[ $OK -eq 1 ]]
+		then
+			echo "${RARR[0]} (${RARR[1]}) ok"
+			cd "${RARR[0]}"
+			if ! eagle-spin-prod-files "${RARR[1]}" 2>&1 | tee "${RARR[0]}/log"
+			then
+				ERROR="failed"
+				OK=0
+			fi
+		fi
+
+		if [[ $OK -eq 1 ]]
+		then
+			touch "${RARR[0]}/complete"
+		fi
+
+		if [[ $OK -ne 1 ]]
+		then
+			echo "$ERROR"
+		fi
+	done
+) 3<>"$FIFO"
