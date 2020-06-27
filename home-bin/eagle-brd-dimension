@@ -43,38 +43,45 @@ $fileprefix =~ s/\.brd$//;
 my $xml = new XML::Simple;
 my $data = $xml->XMLin($ARGV[0]);
 
-for (@{$data->{drawing}->{board}->{plain}->{wire}}) {
-	if ($_->{layer} == 20) {
-		if (@brd_offset == 0) {
-			@brd_offset = ($_->{x1}, $_->{y1}, $_->{x1}, $_->{y1});
+if ($data->{drawing}->{board}->{plain}->{wire}) {
+	for (@{$data->{drawing}->{board}->{plain}->{wire}}) {
+		if ($_->{layer} == 20) {
+			if (@brd_offset == 0) {
+				@brd_offset = ($_->{x1}, $_->{y1}, $_->{x1}, $_->{y1});
+			}
+			$brd_offset[0] = $_->{x1} if $_->{x1} < $brd_offset[0];
+			$brd_offset[1] = $_->{y1} if $_->{y1} < $brd_offset[1];
+			$brd_offset[2] = $_->{x1} if $_->{x1} > $brd_offset[2];
+			$brd_offset[3] = $_->{y1} if $_->{y1} > $brd_offset[3];
+			$brd_offset[0] = $_->{x2} if $_->{x2} < $brd_offset[0];
+			$brd_offset[1] = $_->{y2} if $_->{y2} < $brd_offset[1];
+			$brd_offset[2] = $_->{x2} if $_->{x2} > $brd_offset[2];
+			$brd_offset[3] = $_->{y2} if $_->{y2} > $brd_offset[3];
 		}
-		$brd_offset[0] = $_->{x1} if $_->{x1} < $brd_offset[0];
-		$brd_offset[1] = $_->{y1} if $_->{y1} < $brd_offset[1];
-		$brd_offset[2] = $_->{x1} if $_->{x1} > $brd_offset[2];
-		$brd_offset[3] = $_->{y1} if $_->{y1} > $brd_offset[3];
-		$brd_offset[0] = $_->{x2} if $_->{x2} < $brd_offset[0];
-		$brd_offset[1] = $_->{y2} if $_->{y2} < $brd_offset[1];
-		$brd_offset[2] = $_->{x2} if $_->{x2} > $brd_offset[2];
-		$brd_offset[3] = $_->{y2} if $_->{y2} > $brd_offset[3];
 	}
 }
 
-for (@{$data->{drawing}->{board}->{plain}->{circle}}) {
-	if ($_->{layer} == 20) {
-		my ($x1, $y1, $x2, $y2) = ($_->{x} - $_->{radius}, $_->{y} - $_->{radius}, $_->{x} + $_->{radius}, $_->{y} + $_->{radius});
-		if (@brd_offset == 0) {
-			@brd_offset = ($x1, $y1, $x2, $y2);
+eval {
+	if ($data->{drawing}->{board}->{plain}->{circle}) {
+# 		die Dumper \$data->{drawing}->{board}->{plain}->{circle};
+		for (@{$data->{drawing}->{board}->{plain}->{circle}}) {
+			if ($_->{layer} == 20) {
+				my ($x1, $y1, $x2, $y2) = ($_->{x} - $_->{radius}, $_->{y} - $_->{radius}, $_->{x} + $_->{radius}, $_->{y} + $_->{radius});
+				if (@brd_offset == 0) {
+					@brd_offset = ($x1, $y1, $x2, $y2);
+				}
+				$brd_offset[0] = $x1 if $x1 < $brd_offset[0];
+				$brd_offset[1] = $y1 if $y1 < $brd_offset[1];
+				$brd_offset[2] = $x1 if $x1 > $brd_offset[2];
+				$brd_offset[3] = $y1 if $y1 > $brd_offset[3];
+				$brd_offset[0] = $x2 if $x2 < $brd_offset[0];
+				$brd_offset[1] = $y2 if $y2 < $brd_offset[1];
+				$brd_offset[2] = $x2 if $x2 > $brd_offset[2];
+				$brd_offset[3] = $y2 if $y2 > $brd_offset[3];
+			}
 		}
-		$brd_offset[0] = $x1 if $x1 < $brd_offset[0];
-		$brd_offset[1] = $y1 if $y1 < $brd_offset[1];
-		$brd_offset[2] = $x1 if $x1 > $brd_offset[2];
-		$brd_offset[3] = $y1 if $y1 > $brd_offset[3];
-		$brd_offset[0] = $x2 if $x2 < $brd_offset[0];
-		$brd_offset[1] = $y2 if $y2 < $brd_offset[1];
-		$brd_offset[2] = $x2 if $x2 > $brd_offset[2];
-		$brd_offset[3] = $y2 if $y2 > $brd_offset[3];
 	}
-}
+};
 
 my ($dx, $dy, $cx, $cy) = (
 	($brd_offset[2] - $brd_offset[0]),
