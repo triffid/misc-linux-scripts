@@ -1,0 +1,18 @@
+#!/bin/bash
+
+ACCEL=2
+
+if [ -n "$1" ]
+then
+	ACCEL="$1"
+fi
+
+for N in $(xinput | grep Logitech | perl -ne '/id=(\d+)/ && print "$1\n";')
+do
+	xinput set-prop $N 'Coordinate Transformation Matrix' "$ACCEL", 0, 0, 0, "$ACCEL", 0, 0, 0, 1
+done
+
+for I in $(solaar show | egrep '^  [0-9]+: ' | cut -d: -f1)
+do
+	solaar config $I pointer_speed 511
+done
