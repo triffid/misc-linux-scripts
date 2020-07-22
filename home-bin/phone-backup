@@ -2,32 +2,47 @@
 
 SERIAL="$(lsusb -d 18d1:4ee7 -v 2>/dev/null | grep iSerial | awk '{ print $3; }')"
 
-adb -s $SERIAL shell 'cd /sdcard/DCIM/Camera; bash fix-pics.sh'
+cd ~/Private/DCIM/Camera
 
-adb -s $SERIAL shell '(echo address=127.0.0.1; echo port=1873; echo "[sdcard]"; echo path=/sdcard; echo use chroot = false; echo read only = false) > /sdcard/rsyncd.conf'
-
-adb -s $SERIAL shell '/system/xbin/rsync --daemon --config=/sdcard/rsyncd.conf --log-file=/sdcard/rsync.log --verbose' & sleep 0.5
-
-adb -s $SERIAL forward tcp:6010 tcp:1873
-
-RUN=1
-
-while [ $RUN -eq 1 ]
+for F in $(adb shell 'cd /sdcard/DCIM/Camera; ls -1 */*/*jpg')
 do
-	rsync -av --progress --stats --size-only rsync://localhost:6010/sdcard/DCIM/Camera/ /home/triffid/Private/DCIM/Camera/
-	if [ $? -eq 0 ]
+	if ! [ -e "$F" ]
 	then
-		RUN=0
-	else
-		if adb devices | grep -q "^$SERIAL"
-		then
-			echo Retrying...
-			sleep 1
-		else
-			echo Device disappeared
-			RUN=0
-		fi
+		[ -d "$(dirname "$F")" ] || mkdir -p "$(dirname "$F")"
+		pushd "$(dirname "$F")" &>/dev/null
+		adb pull "/sdcard/DCIM/Camera/$F"
+		popd &>/dev/null
 	fi
 done
 
-kill %%
+exit 1
+
+# adb -s $SERIAL shell 'cd /sdcard/DCIM/Camera; bash fix-pics.sh'
+#
+# adb -s $SERIAL shell '(echo address=127.0.0.1; echo port=1873; echo "[sdcard]"; echo path=/sdcard; echo use chroot = false; echo read only = false) > /sdcard/rsyncd.conf'
+#
+# adb -s $SERIAL shell '/system/xbin/rsync --daemon --config=/sdcard/rsyncd.conf --log-file=/sdcard/rsync.log --verbose' & sleep 0.5
+#
+# adb -s $SERIAL forward tcp:6010 tcp:1873
+#
+# RUN=1
+#
+# while [ $RUN -eq 1 ]
+# do
+# 	rsync -av --progress --stats --size-only rsync://localhost:6010/sdcard/DCIM/Camera/ /home/triffid/Private/DCIM/Camera/
+# 	if [ $? -eq 0 ]
+# 	then
+# 		RUN=0
+# 	else
+# 		if adb devices | grep -q "^$SERIAL"
+# 		then
+# 			echo Retrying...
+# 			sleep 1
+# 		else
+# 			echo Device disappeared
+# 			RUN=0
+# 		fi
+# 	fi
+# done
+#
+# kill %%
