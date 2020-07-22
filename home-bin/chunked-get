@@ -1,0 +1,169 @@
+#!/bin/bash
+
+URL=""
+USER=""
+JOBS=32
+CHUNKSIZE=10485760
+
+function usage {
+	echo "Usage: ${0##*/} [-c chunksize] [-j concurrent downloads] [-o outfile] [-u username] url"
+}
+
+if [ -z "$1" ]
+then
+	usage
+	exit 0
+fi
+
+trap 'kill 0' SIGINT
+trap 'kill 0' SIGTERM
+trap 'kill 0' SIGKILL
+
+while [ -n "$1" ]
+do
+	case "$1" in
+		"-u")
+			shift
+			USER="$1"
+			;;
+		"-c")
+			shift
+			CHUNKSIZE=$(($1 + 0))
+			;;
+		"-o")
+			shift
+			FNAME="$1"
+			;;
+		"-j")
+			shift
+			JOBS=$(($1 + 0))
+			;;
+		*)
+			if [ -z "$URL" ]
+			then
+				URL="$1"
+			else
+				echo "Unknown option: $1"
+				usage
+				exit 1
+			fi
+			;;
+	esac
+	shift
+done
+
+FNAME=${FNAME:-${URL##*/}}
+FNAME=${FNAME:-index.html}
+
+echo "Downloading $FNAME from $URL"
+
+if [ -n "$USER" ]
+then
+	echo -n "User $USER Password: "
+	read -s PASS
+fi
+
+SIZE=$(curl ${USER:+-u "$USER:$PASS"} -sI "$URL" | tee /dev/stderr | awk '/Content-Length/{gsub("\\r", ""); print $2}' IGNORECASE=1)
+
+if [ -z "$SIZE" ]
+then
+	echo "Could not determine size, redirected?"
+	exit 1
+fi
+
+echo "Size is '$SIZE'"
+
+COUNT=$(($SIZE / $CHUNKSIZE))
+
+echo -n "$(($SIZE / $CHUNKSIZE))x$((CHUNKSIZE / 1048576))MB chunks"
+if [ $(($SIZE - (($SIZE / $CHUNKSIZE) * $CHUNKSIZE))) -eq 0 ]
+then
+	COUNT=$(($COUNT - 1))
+else
+	echo -n " and one $(($SIZE - (($SIZE / $CHUNKSIZE) * $CHUNKSIZE)))b chunk"
+fi
+echo " for $(($COUNT + 1)) total chunks"
+
+for I in $(seq -w 0 $COUNT)
+do
+	N=$((10#$I))
+	CURSIZE=0
+	CHUNKFN="$FNAME.$I"
+	if [ -e "$CHUNKFN" ]
+	then
+		CURSIZE=$(stat -c "%s" "$CHUNKFN")
+		THISCHUNKSIZE=$CHUNKSIZE
+		if [ $N -eq $COUNT ]
+		then
+			THISCHUNKSIZE=$(($SIZE - ($CHUNKSIZE * $N)))
+		fi
+		if [ $CURSIZE -lt $THISCHUNKSIZE ]
+		then
+			echo "Re-downloading chunk $CHUNKFN (because curl can't handle -C and -r together)"
+			rm "$CHUNKFN"
+			( while ! curl -sS ${USER:+-u "$USER:$PASS"} -o "$CHUNKFN" --range $(($N * $CHUNKSIZE))-$((($N * $CHUNKSIZE) + $THISCHUNKSIZE - 1)) "$URL"; do echo "Retrying $CHUNKFN"; rm "$CHUNKFN"; sleep 1; done; echo "Chunk $CHUNKFN finished" ) &
+			sleep 0.5 # attempt to avoid syn flood
+		elif [ $CURSIZE -gt $THISCHUNKSIZE ]
+		then
+			echo "$CHUNKFN too big! Re-downloading"
+			rm "$CHUNKFN"
+			( while ! curl -sS ${USER:+-u "$USER:$PASS"} -o "$CHUNKFN" --range $(($N * $CHUNKSIZE))-$((($N * $CHUNKSIZE) + $THISCHUNKSIZE - 1)) "$URL"; do echo "Retrying $CHUNKFN"; rm "$CHUNKFN"; sleep 1; done; echo "Chunk $CHUNKFN finished" ) &
+			sleep 0.5 # attempt to avoid syn flood
+        else
+            echo "$CHUNKFN complete."
+        fi
+	else
+		echo "Starting chunk $CHUNKFN"
+		( while ! curl -sS ${USER:+-u "$USER:$PASS"} -o "$CHUNKFN" --range $(($N * $CHUNKSIZE))-$(((($N + 1) * $CHUNKSIZE) - 1)) "$URL"; do echo "Retrying $CHUNKFN"; rm "$CHUNKFN"; sleep 1; done; echo "Chunk $CHUNKFN finished" ) &
+		sleep 0.5 # attempt to avoid syn flood
+	fi
+	while [ $(jobs -p | wc -l) -ge $JOBS ]
+	do
+		wait -n
+	done
+done
+
+wait
+
+echo "All chunks finished"
+
+ALLOK=1
+
+PARTS=""
+
+for I in $(seq -w 0 $COUNT)
+do
+	N=$((10#$I))
+	CHUNKFN="$FNAME.$I"
+	if [ -e "$CHUNKFN" ]
+	then
+		CURSIZE=$(stat -c "%s" "$CHUNKFN")
+		THISCHUNKSIZE=$CHUNKSIZE
+		if [ $N -eq $COUNT ]
+		then
+			THISCHUNKSIZE=$(($SIZE - ($CHUNKSIZE * $N)))
+		fi
+		if [ $CURSIZE -lt $THISCHUNKSIZE ]
+		then
+			echo "$FNAME.$I is incomplete! (Got $CURSIZE of $CHUNKSIZE bytes) Run $(</proc/$$/cmdline) again"
+			ALLOK=0
+		fi
+	else
+		echo "$FNAME.$I is missing! Run $(</proc/$$/cmdline) again"
+		ALLOK=0
+	fi
+done
+
+if [ $ALLOK -eq 1 ]
+then
+	for I in $(seq -w 0 $COUNT)
+	do
+		dd if="$FNAME.$I" of="$FNAME" bs=${CHUNKSIZE} count=1 seek=$((10#$I)) &>/dev/null
+	done
+	echo "$FNAME successfully generated."
+
+	echo rm $(for I in $(seq -w 0 $COUNT); do echo "$FNAME.$I"; done)
+else
+	rm "$FNAME"
+	exit 1
+fi
