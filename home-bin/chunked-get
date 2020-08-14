@@ -3,10 +3,16 @@
 URL=""
 USER=""
 JOBS=32
-CHUNKSIZE=10485760
+CHUNKSIZE=1048576
+DELAY=0.5
+
+RED=$'\e[31m'
+BOLD=$'\e[1m'
+GREEN=$'\e[32m'
+RESETCOLOUR=$'\e[0m'
 
 function usage {
-	echo "Usage: ${0##*/} [-c chunksize] [-j concurrent downloads] [-o outfile] [-u username] url"
+	echo "Usage: ${0##*/} [-c chunksize] [-j concurrent downloads] [-o outfile] [-u username] [-d delay] [--sha1sum checksum] [--sha256sum checksum] [--md5sum checksum] url"
 }
 
 if [ -z "$1" ]
@@ -38,6 +44,22 @@ do
 			shift
 			JOBS=$(($1 + 0))
 			;;
+		"-d")
+			shift
+			DELAY="$1"
+			;;
+		"--sha1sum")
+			shift
+			SHA1SUM="$1"
+			;;
+		"--sha256sum")
+			shift
+			SHA256SUM="$1"
+			;;
+		"--md5sum")
+			shift
+			MD5SUM="$1"
+			;;
 		*)
 			if [ -z "$URL" ]
 			then
@@ -63,9 +85,9 @@ then
 	read -s PASS
 fi
 
-SIZE=$(curl ${USER:+-u "$USER:$PASS"} -sI "$URL" | tee /dev/stderr | awk '/Content-Length/{gsub("\\r", ""); print $2}' IGNORECASE=1)
+SIZE=$(curl ${USER:+-u "$USER:$PASS"} -LsS --range 0-1 -o /dev/null -D - "$URL" | tee /dev/stderr | perl -ne 'BEGIN { $s = 0; } /Content-Length:\s*(\d+)/i && do { $s = $1 if $1 > $s }; /Content-Range:\s*bytes\s+(\d+)-(\d+)\/(\d+)/i && do { $s = $3 if $3 > $s; }; END { print "$s\n"; }')
 
-if [ -z "$SIZE" ]
+if [ -z "$SIZE" ] || [ "$SIZE" -le 65536 ]
 then
 	echo "Could not determine size, redirected?"
 	exit 1
@@ -101,21 +123,21 @@ do
 		then
 			echo "Re-downloading chunk $CHUNKFN (because curl can't handle -C and -r together)"
 			rm "$CHUNKFN"
-			( while ! curl -sS ${USER:+-u "$USER:$PASS"} -o "$CHUNKFN" --range $(($N * $CHUNKSIZE))-$((($N * $CHUNKSIZE) + $THISCHUNKSIZE - 1)) "$URL"; do echo "Retrying $CHUNKFN"; rm "$CHUNKFN"; sleep 1; done; echo "Chunk $CHUNKFN finished" ) &
-			sleep 0.5 # attempt to avoid syn flood
+			( while ! curl -LsS ${USER:+-u "$USER:$PASS"} -o "$CHUNKFN" --range $(($N * $CHUNKSIZE))-$((($N * $CHUNKSIZE) + $THISCHUNKSIZE - 1)) "$URL"; do echo "Retrying $CHUNKFN"; rm "$CHUNKFN"; sleep 1; done; echo "Chunk $CHUNKFN finished" ) &
+			sleep "$DELAY" # attempt to avoid syn flood
 		elif [ $CURSIZE -gt $THISCHUNKSIZE ]
 		then
 			echo "$CHUNKFN too big! Re-downloading"
 			rm "$CHUNKFN"
-			( while ! curl -sS ${USER:+-u "$USER:$PASS"} -o "$CHUNKFN" --range $(($N * $CHUNKSIZE))-$((($N * $CHUNKSIZE) + $THISCHUNKSIZE - 1)) "$URL"; do echo "Retrying $CHUNKFN"; rm "$CHUNKFN"; sleep 1; done; echo "Chunk $CHUNKFN finished" ) &
-			sleep 0.5 # attempt to avoid syn flood
+			( while ! curl -LsS ${USER:+-u "$USER:$PASS"} -o "$CHUNKFN" --range $(($N * $CHUNKSIZE))-$((($N * $CHUNKSIZE) + $THISCHUNKSIZE - 1)) "$URL"; do echo "Retrying $CHUNKFN"; rm "$CHUNKFN"; sleep 1; done; echo "Chunk $CHUNKFN finished" ) &
+			sleep "$DELAY" # attempt to avoid syn flood
         else
             echo "$CHUNKFN complete."
         fi
 	else
 		echo "Starting chunk $CHUNKFN"
-		( while ! curl -sS ${USER:+-u "$USER:$PASS"} -o "$CHUNKFN" --range $(($N * $CHUNKSIZE))-$(((($N + 1) * $CHUNKSIZE) - 1)) "$URL"; do echo "Retrying $CHUNKFN"; rm "$CHUNKFN"; sleep 1; done; echo "Chunk $CHUNKFN finished" ) &
-		sleep 0.5 # attempt to avoid syn flood
+		( while ! curl -LsS ${USER:+-u "$USER:$PASS"} -o "$CHUNKFN" --range $(($N * $CHUNKSIZE))-$(((($N + 1) * $CHUNKSIZE) - 1)) "$URL"; do echo "Retrying $CHUNKFN"; rm "$CHUNKFN"; sleep 1; done; echo "Chunk $CHUNKFN finished" ) &
+		sleep "$DELAY" # attempt to avoid syn flood
 	fi
 	while [ $(jobs -p | wc -l) -ge $JOBS ]
 	do
@@ -160,9 +182,45 @@ then
 	do
 		dd if="$FNAME.$I" of="$FNAME" bs=${CHUNKSIZE} count=1 seek=$((10#$I)) &>/dev/null
 	done
-	echo "$FNAME successfully generated."
+	echo "${GREEN}${FNAME} successfully generated.${RESETCOLOUR}"
 
-	echo rm $(for I in $(seq -w 0 $COUNT); do echo "$FNAME.$I"; done)
+	if [ -n "$SHA1SUM" ]
+	then
+		CHECK="$(sha1sum "$FNAME")"
+		if grep -qi "^$SHA1SUM" <<< "$CHECK"
+		then
+			echo "${GREEN}${BOLD}Checksum OK${RESETCOLOUR}"
+		else
+			echo "Sha1sum failed, expected $SHA1SUM got $CHECK"
+			exit 1
+		fi
+	fi
+
+	if [ -n "$SHA256SUM" ]
+	then
+		CHECK="$(sha256sum "$FNAME")"
+		if grep -qi "^$SHA256SUM" <<< "$CHECK"
+		then
+			echo "${GREEN}${BOLD}Checksum OK${RESETCOLOUR}"
+		else
+			echo "Sha256sum failed, expected $SHA256SUM got $CHECK"
+			exit 1
+		fi
+	fi
+
+	if [ -n "$MD5SUM" ]
+	then
+		CHECK="$(md5sum "$FNAME")"
+		if grep -qi "^$MD5SUM" <<< "$CHECK"
+		then
+			echo "${GREEN}${BOLD}Checksum OK${RESETCOLOUR}"
+		else
+			echo "MD5sum failed, expected $MD5SUM got $CHECK"
+			exit 1
+		fi
+	fi
+
+	rm $(for I in $(seq -w 0 $COUNT); do echo "$FNAME.$I"; done)
 else
 	rm "$FNAME"
 	exit 1
