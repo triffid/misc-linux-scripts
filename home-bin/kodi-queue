@@ -26,8 +26,8 @@ then
 		fi
 		shift
 	done
-	jq . <<< '{ "id": 1, "jsonrpc": "2.0", "method": "Playlist.Add", "params": {"playlistid": 1, "item": ['"$LIST"'] } }'
-	#curl --header 'Content-Type: application/json' --data-binary '{ "id": 1, "jsonrpc": "2.0", "method": "Playlist.Add", "params": {"playlistid": 1, "item": ['"$LIST"'] } }' jeanelle.local:8080/jsonrpc; echo
+	#jq . <<< '{ "id": 1, "jsonrpc": "2.0", "method": "Playlist.Add", "params": {"playlistid": 1, "item": ['"$LIST"'] } }'
+	curl --header 'Content-Type: application/json' --data-binary '{ "id": 1, "jsonrpc": "2.0", "method": "Playlist.Add", "params": {"playlistid": 1, "item": ['"$LIST"'] } }' jeanelle.local:8080/jsonrpc; echo
 else
 	echo "Usage: kodi-play <files or URLs>"
 	exit 1
