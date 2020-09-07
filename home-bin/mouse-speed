@@ -1,15 +1,24 @@
 #!/bin/bash
 
-ACCEL=2
+# ACCEL=2
+#
+# if [ -n "$1" ]
+# then
+# 	ACCEL="$1"
+# fi
+#
+# for N in $(xinput | grep Logitech | perl -ne '/id=(\d+)/ && print "$1\n";')
+# do
+# 	xinput set-prop $N 'Coordinate Transformation Matrix' "$ACCEL", 0, 0, 0, "$ACCEL", 0, 0, 0, 1
+# done
 
-if [ -n "$1" ]
-then
-	ACCEL="$1"
-fi
-
-for N in $(xinput | grep Logitech | perl -ne '/id=(\d+)/ && print "$1\n";')
+for N in $(xinput | grep Logitech | cut -d= -f2 | cut -d$'\t' -f1)
 do
-	xinput set-prop $N 'Coordinate Transformation Matrix' "$ACCEL", 0, 0, 0, "$ACCEL", 0, 0, 0, 1
+# 	xinput set-prop $N 'Coordinate Transformation Matrix' "$ACCEL", 0, 0, 0, "$ACCEL", 0, 0, 0, 1
+	xinput set-prop $N "Device Accel Profile" 2
+	xinput set-prop $N "Device Accel Constant Deceleration" 1
+	xinput set-prop $N "Device Accel Adaptive Deceleration" 32
+	xinput set-prop $N "Device Accel Velocity Scaling" 0.5
 done
 
 for I in $(solaar show | egrep '^  [0-9]+: ' | cut -d: -f1)
