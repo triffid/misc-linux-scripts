@@ -16,9 +16,9 @@ restore() {
 	then
 		ebegin "Loading saved rules"
 		( while read; do ip rule add $REPLY; done; ) < "${IP_RULES_SAVE}"
-		while ip rule show | egrep -v '^(0|32766|32767):' | sed -e 's/.*:\s*//' | sort | uniq -d | grep .
+		while ip rule show | egrep -v '^(0|10|32766|32767):' | sed -e 's/.*:\s*//' | sort | uniq -d | grep .
 		do
-			ip rule show | egrep -v '^(0|32766|32767):' | sed -e 's/.*:\s*/ip rule del /' | sort | uniq -d | sh
+			ip rule show | egrep -v '^(0|10|32766|32767):' | sed -e 's/.*:\s*/ip rule del /' | sort | uniq -d | sh
 		done
 	else
 		ebegin "No saved rules"
