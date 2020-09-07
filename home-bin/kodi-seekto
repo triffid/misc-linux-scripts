@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [ -n "$1" ]
+then
+	curl --header 'Content-Type: application/json' --data-binary '{ "id": 1, "jsonrpc": "2.0", "method": "Player.Seek", "params": { "playerid": 1, "time": '"$1"' }}' jeanelle.local:8080/jsonrpc
+	echo
+else
+	echo "Usage: kodi-seekto <time>"
+	exit 1
+fi
