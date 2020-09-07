@@ -13,10 +13,10 @@ do
 		IP=$(grep ^lns /etc/xl2tpd/xl2tpd.conf | head -n1 | cut -d= -f2 | xargs echo)
 		if [ -n "$IP" ]
 		then
-			HOST=$(grep $IP /etc/unbound/unbound.pia | head -n1 | cut -d\" -f2 | cut -d. -f1)
+			HOST=$(grep $IP /etc/bind/pri/pia.zone | head -n1 | cut -d\" -f2 | cut -d. -f1)
 			if [ -z "$HOST" ]
 			then
-				HOST=$(grep $(cut -d. -f1-3 <<< $IP) /etc/unbound/unbound.pia | head -n1 | cut -d\" -f2 | cut -d. -f1)
+				HOST=$(grep $(cut -d. -f1-3 <<< $IP) /etc/bind/pri/pia.zone | head -n1 | awk '{print $1 " " $4}')
 			fi
 			if [ -z "$HOST" ]
 			then
