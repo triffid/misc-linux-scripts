@@ -5,7 +5,6 @@ USER=""
 JOBS=32
 CHUNKSIZE=1048576
 DELAY=0.5
-COOKIEJAR=""
 
 RED=$'\e[31m'
 BOLD=$'\e[1m'
@@ -79,6 +78,55 @@ do
 	shift
 done
 
+function cursize () {
+	if [ -e "$1" ]
+	then
+		stat -c "%s" "$1" 2>/dev/null
+		return 0
+	fi
+	echo 0
+}
+
+function getonce() {
+	curl -LsS \
+		${USER:+-u "$USER:$PASS"} \
+		${COOKIEJAR:+-b "$COOKIEJAR"} \
+		-o "$CHUNKFN" \
+		--range $(($N * $CHUNKSIZE))-$((($N * $CHUNKSIZE) + $THISCHUNKSIZE - 1)) \
+		"$URL"
+}
+
+function get() {
+	local I="$1"
+	local N=$((10#$I))
+	local CHUNKFN=".$FNAME.$I"
+	local THISCHUNKSIZE=$CHUNKSIZE
+
+	if [ $N -eq $COUNT ]
+	then
+		THISCHUNKSIZE=$(($SIZE - ($CHUNKSIZE * $N)))
+	fi
+
+	(
+		getonce
+
+		while [ $(cursize "$CHUNKFN") -lt $THISCHUNKSIZE ]
+		do
+			if [ -e "$CHUNKFN"]
+			then
+				echo "Re-downloading chunk $CHUNKFN (because curl can't handle -C and -r together)"
+				rm "$CHUNKFN"
+			fi
+
+			sleep $DELAY
+
+			getonce
+		done
+
+		echo "$CHUNKFN complete"
+	) &
+}
+
 FNAME=${FNAME:-${URL##*/}}
 FNAME=${FNAME:-index.html}
 
@@ -90,7 +138,7 @@ then
 	read -s PASS
 fi
 
-SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -LsS --range 0-1 -o /dev/null -D - "$URL" | tee /dev/stderr | perl -ne 'BEGIN { $s = 0; } /Content-Length:\s*(\d+)/i && do { $s = $1 if $1 > $s }; /Content-Range:\s*bytes\s+(\d+)-(\d+)\/(\d+)/i && do { $s = $3 if $3 > $s; }; END { print "$s\n"; }')
+SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - "$URL" | tee /dev/stderr | perl -ne 'BEGIN { $s = 0; } /Content-Length:\s*(\d+)/i && do { $s = $1 if $1 > $s }; /Content-Range:\s*bytes\s+(\d+)-(\d+)\/(\d+)/i && do { $s = $3 if $3 > $s; }; END { print "$s\n"; }')
 
 if [ -z "$SIZE" ] || [ "$SIZE" -le 65536 ]
 then
@@ -115,35 +163,20 @@ for I in $(seq -w 0 $COUNT)
 do
 	N=$((10#$I))
 	CURSIZE=0
-	CHUNKFN="$FNAME.$I"
-	if [ -e "$CHUNKFN" ]
+	CHUNKFN=".$FNAME.$I"
+
+	THISCHUNKSIZE=$CHUNKSIZE
+	if [ $N -eq $COUNT ]
 	then
-		CURSIZE=$(stat -c "%s" "$CHUNKFN")
-		THISCHUNKSIZE=$CHUNKSIZE
-		if [ $N -eq $COUNT ]
-		then
-			THISCHUNKSIZE=$(($SIZE - ($CHUNKSIZE * $N)))
-		fi
-		if [ $CURSIZE -lt $THISCHUNKSIZE ]
-		then
-			echo "Re-downloading chunk $CHUNKFN (because curl can't handle -C and -r together)"
-			rm "$CHUNKFN"
-			( while ! curl -LsS ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -o "$CHUNKFN" --range $(($N * $CHUNKSIZE))-$((($N * $CHUNKSIZE) + $THISCHUNKSIZE - 1)) "$URL"; do echo "Retrying $CHUNKFN"; rm "$CHUNKFN"; sleep 1; done; echo "Chunk $CHUNKFN finished" ) &
-			sleep "$DELAY" # attempt to avoid syn flood
-		elif [ $CURSIZE -gt $THISCHUNKSIZE ]
-		then
-			echo "$CHUNKFN too big! Re-downloading"
-			rm "$CHUNKFN"
-			( while ! curl -LsS ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -o "$CHUNKFN" --range $(($N * $CHUNKSIZE))-$((($N * $CHUNKSIZE) + $THISCHUNKSIZE - 1)) "$URL"; do echo "Retrying $CHUNKFN"; rm "$CHUNKFN"; sleep 1; done; echo "Chunk $CHUNKFN finished" ) &
-			sleep "$DELAY" # attempt to avoid syn flood
-        else
-            echo "$CHUNKFN complete."
-        fi
-	else
-		echo "Starting chunk $CHUNKFN"
-		( while ! curl -LsS ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -o "$CHUNKFN" --range $(($N * $CHUNKSIZE))-$(((($N + 1) * $CHUNKSIZE) - 1)) "$URL"; do echo "Retrying $CHUNKFN"; rm "$CHUNKFN"; sleep 1; done; echo "Chunk $CHUNKFN finished" ) &
-		sleep "$DELAY" # attempt to avoid syn flood
+		THISCHUNKSIZE=$(($SIZE - ($CHUNKSIZE * $N)))
 	fi
+	if [ $(cursize "$CHUNKFN") -lt $THISCHUNKSIZE ]
+	then
+		echo "Starting $CHUNKFN"
+		get "$I"
+		sleep $DELAY
+	fi
+
 	while [ $(jobs -p | wc -l) -ge $JOBS ]
 	do
 		wait -n
@@ -161,7 +194,7 @@ PARTS=""
 for I in $(seq -w 0 $COUNT)
 do
 	N=$((10#$I))
-	CHUNKFN="$FNAME.$I"
+	CHUNKFN=".$FNAME.$I"
 	if [ -e "$CHUNKFN" ]
 	then
 		CURSIZE=$(stat -c "%s" "$CHUNKFN")
@@ -172,11 +205,11 @@ do
 		fi
 		if [ $CURSIZE -lt $THISCHUNKSIZE ]
 		then
-			echo "$FNAME.$I is incomplete! (Got $CURSIZE of $CHUNKSIZE bytes) Run $(</proc/$$/cmdline) again"
+			echo "$CHUNKFN is incomplete! (Got $CURSIZE of $CHUNKSIZE bytes) Run $0 again"
 			ALLOK=0
 		fi
 	else
-		echo "$FNAME.$I is missing! Run $(</proc/$$/cmdline) again"
+		echo "$CHUNKFN is missing! Run $0 again"
 		ALLOK=0
 	fi
 done
@@ -185,7 +218,7 @@ if [ $ALLOK -eq 1 ]
 then
 	for I in $(seq -w 0 $COUNT)
 	do
-		dd if="$FNAME.$I" of="$FNAME" bs=${CHUNKSIZE} count=1 seek=$((10#$I)) &>/dev/null
+		dd if=".$FNAME.$I" of="$FNAME" bs=${CHUNKSIZE} count=1 seek=$((10#$I)) &>/dev/null
 	done
 	echo "${GREEN}${FNAME} successfully generated.${RESETCOLOUR}"
 
@@ -225,7 +258,7 @@ then
 		fi
 	fi
 
-	rm $(for I in $(seq -w 0 $COUNT); do echo "$FNAME.$I"; done)
+	rm $(for I in $(seq -w 0 $COUNT); do echo ".$FNAME.$I"; done)
 else
 	rm "$FNAME"
 	exit 1
