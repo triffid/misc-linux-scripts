@@ -5,6 +5,6 @@
 # available at http://www.gnu.org/copyleft/gpl.html
 
 while [[ -n $1 ]]; do
-	grep -h $1 /usr/portage/profiles/use.*
+	grep -h $1 /var/db/repos/*/profiles/use.*
 	shift
 done
