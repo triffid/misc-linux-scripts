@@ -1,15 +1,30 @@
-#/bin/sh
+#/bin/bash
 
-cd /usr/portage;
+shopt -s nullglob
+
+function inherit {
+	while [ -n "$1" ]
+	do
+		[ -r /var/db/repos/gentoo/eclass/"$1".eclass ] && source /var/db/repos/gentoo/eclass/"$1".eclass &>/dev/null
+		shift
+	done
+}
+
+cd /var/db/repos
 
 {
-	for F in *-*/*/; do
-		bash -c "
-			echo -en \"${F%/}\t\";
-			source $F*ebuild 2>/dev/null;
-			perl -e 's/[\s\r\n]+/ /s for @ARGV; printf \"%s\t(%s)\n\", @ARGV' \"\$(echo \$DESCRIPTION)\" \"\$(echo \$HOMEPAGE)\"
-		";
-	done;
+	for R in *
+	do
+		pushd "$R"
+		for F in *-*/*/; do
+			echo -en "${F%/}::$R\t";
+			(
+				source $F*ebuild &>/dev/null
+				perl -e 's/[\s\r\n]+/ /s for @ARGV; printf "%s\t(%s)\n", @ARGV' "$DESCRIPTION" "$HOMEPAGE"
+			) || echo "failed to parse ebuild"
+		done
+		popd
+	done
 } | tee /var/lib/portage/searchdesc.new &&
 	mv /var/lib/portage/searchdesc.new /var/lib/portage/searchdesc ||
 	rm /var/lib/portage/searchdesc.new

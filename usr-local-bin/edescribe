@@ -11,7 +11,7 @@ do
 			cgrep "^\\S*\\b$1\\b" brown							|| \
 				echo "$1 not found"
 	else
-		for P in /usr/portage/*-*/$1
+		for P in /var/db/repos/*/portage/*-*/$1
 		do
 			if [ -d $P ]; then
 				. $P/*.ebuild 2>/dev/null
