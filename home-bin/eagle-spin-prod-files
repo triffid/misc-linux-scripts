@@ -95,7 +95,7 @@ zip "${NAMEREV}-DesignFiles-Eagle7.zip" "${NAMEREV}.sch" "${NAMEREV}.brd" || exi
 
 eagle -N- -C "
 	EDIT .sch;
-		print 10 -1 file ${NAMEREV}-schematic.pdf paper A4 sheets ALL landscape -caption -window -black -mirror -rotate -upsidedown;
+		print 100 -1 file ${NAMEREV}-schematic.pdf paper A3 sheets ALL landscape -caption -window -black -mirror -rotate -upsidedown;
 	EDIT .brd;
 		display none tNames tValues tPlace tDocu bNames bValues bPlace bDocu;
 		group all;
@@ -105,10 +105,10 @@ eagle -N- -C "
 		set color_layer dimension 15;
 		set color_layer tPlace 54; set color_layer tDocu 54; set color_layer tNames 7; set color_layer tValues 23; set color_layer tStop 55; set fill_layer tStop 11;
 		display none dimension pads tPlace tDocu tNames tValues tStop Measures;
-		print 10 -1 file ${NAMEREV}-Assembly-TOP.pdf    paper A4 sheets ALL landscape -mirror -caption -window -black -rotate -upsidedown;
+		print 100 -1 file ${NAMEREV}-Assembly-TOP.pdf    paper A4 sheets ALL landscape -mirror -caption -window -black -rotate -upsidedown;
 		set color_layer bPlace 54; set color_layer bDocu 54; set color_layer bNames 7; set color_layer bValues 23; set color_layer bStop 55; set fill_layer bStop 12;
 		display none dimension pads bPlace bDocu bNames bValues bStop;
-		print 10 -1 file ${NAMEREV}-Assembly-BOTTOM.pdf paper A4 sheets ALL landscape  mirror -caption -window -black -rotate -upsidedown;
+		print 100 -1 file ${NAMEREV}-Assembly-BOTTOM.pdf paper A4 sheets ALL landscape  mirror -caption -window -black -rotate -upsidedown;
 	set confirm no;
 	quit;" \
 	"${NAMEREV}.sch"
@@ -138,10 +138,11 @@ rm "${NAMEREV}_"*
 
 ### BOM
 
-eagle-brd-export-bom "${NAMEREV}.brd" | head -n1 > "${NAMEREV}-BOM.csv"
+eagle-brd-export-bom "${NAMEREV}.brd" 2>/dev/null | head -n1 > "${NAMEREV}-BOM.csv"
 eagle-brd-export-bom "${NAMEREV}.brd" | tail -n+2 | sort -h -k 1.2 -r >> "${NAMEREV}-BOM.csv"
 
-unoconv -o "${NAMEREV}-BOM.xlsx" "${NAMEREV}-BOM.csv" || exit 1
+unoconv -i FilterOptions=44,34,76 -o "${NAMEREV}-BOM.xlsx" "${NAMEREV}-BOM.csv" || true
+# libreoffice --convert-to xlsx "${NAMEREV}-BOM.csv" || true
 
 ### Assembly
 
@@ -210,6 +211,9 @@ cat "$O/${NAMEREV}-Board-Info.txt"
 if [ -z "$NODELETE" ]
 then
 	rm -rf "$O"
+else
+	# make files in output dir read-only so they always match the zip even if reopened later
+	chmod -w "$O"/*
 fi
 
 echo
