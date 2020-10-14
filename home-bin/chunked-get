@@ -112,7 +112,7 @@ function get() {
 
 		while [ $(cursize "$CHUNKFN") -lt $THISCHUNKSIZE ]
 		do
-			if [ -e "$CHUNKFN"]
+			if [ -e "$CHUNKFN" ]
 			then
 				echo "Re-downloading chunk $CHUNKFN (because curl can't handle -C and -r together)"
 				rm "$CHUNKFN"
@@ -218,6 +218,7 @@ if [ $ALLOK -eq 1 ]
 then
 	for I in $(seq -w 0 $COUNT)
 	do
+		echo $'\e[0G\e[1A\e[2K'"Assembling $FNAME... $I/$COUNT"
 		dd if=".$FNAME.$I" of="$FNAME" bs=${CHUNKSIZE} count=1 seek=$((10#$I)) &>/dev/null
 	done
 	echo "${GREEN}${FNAME} successfully generated.${RESETCOLOUR}"
