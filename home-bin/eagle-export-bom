@@ -1,0 +1,170 @@
+#!/usr/bin/perl
+
+# eagle-export-bom - emit eagle-style BOM by scouring info from schematic and board
+#
+# Copyright (C) 2017-2019 Michael Moon
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+use strict;
+use utf8;
+
+use XML::LibXML;
+use Data::Dumper;
+
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
+binmode STDOUT, "encoding(UTF-8)";
+
+if (@ARGV < 1) {
+	print "Usage: eagle-export-bom [-p] <file.sch>\n";
+	exit 0;
+}
+
+my $fileprefix = $ARGV[0];
+$fileprefix =~ s/\.(sch|brd)$//;
+
+my $sch = XML::LibXML->load_xml(location => $fileprefix.".sch", { encoding => "UTF8" });
+my $brd = XML::LibXML->load_xml(location => $fileprefix.".brd", { encoding => "utf8" });
+
+my %descr;
+
+sub convert_description {
+	my $a = shift(@_);
+	$a =~ s/[\r\n].*//s;
+	$a =~ s/<[^>]*>//g;
+	return $a;
+};
+
+for my $library ($sch->findnodes('/eagle/drawing/schematic/libraries/library')) {
+	if ($library->findnodes('./description')) {
+		$descr{'L/' . $library->{name}} = convert_description((scalar $library->findnodes('./description'))->to_literal . "");
+	}
+	for my $package ($library->findnodes('./packages/package')) {
+		if ($package->findnodes('./description')) {
+			$descr{'P/' . $library->{name} . '/' . $package->{name}} = convert_description((scalar $package->findnodes('./description'))->to_literal . "");
+		}
+	}
+	for my $device ($library->findnodes('./devicesets/deviceset')) {
+		if ($device->findnodes('./description')) {
+			$descr{'D/' . $library->{name} . '/' . $device->{name}} = convert_description((scalar $device->findnodes('./description'))->to_literal . "");
+		}
+	}
+}
+
+# print Dumper \%descr;
+
+my @attrs;
+
+my %schparts;
+
+for my $part ($sch->findnodes('/eagle/drawing/schematic/parts/part')) {
+	next if $part->{library} =~ qw/testpad testpoint/ or $part->{package} ~~ qw/2PT_GND_TIE/;
+	$schparts{$part->{name}} = {} unless $schparts{$part->{name}};
+# 	die $part;
+	for my $attr ($part->findnodes('./@*')) {
+		$schparts{$part->{name}}->{$attr->nodeName} = $attr->value;
+	}
+	for my $attr ($part->findnodes('./attribute')) {
+# 		print $attr->{name} . '=' . $attr->{value};
+# 		print Dumper \$attr->{name};
+		$schparts{$part->{name}}->{attributes}->{$attr->{name}} = $attr->{value};
+# 		print '$schparts{'.$part->{name}.'}->{'.$attr->{name}.'} = '.$attr->{value}.";\n";
+		push @attrs, $attr->{name} unless $attr->{name} ~~ @attrs;
+	}
+# 	die Dumper \$schparts{$part->{name}} if $part->{name} =~ /C7/;
+}
+
+# for my $part ($sch->findnodes('/eagle/drawing/schematic/sheets/sheet/*/parts/part')) {
+# 	next if $part->{library} =~ qw/testpad testpoint/ or $part->{package} ~~ qw/2PT_GND_TIE/;
+# 	$schparts{$part->{name}} = {} unless $schparts{$part->{name}};
+# # 	die $part;
+# 	for my $attr ($part->findnodes('./@*')) {
+# 		$schparts{$part->{name}}->{$attr->nodeName} = $attr->value;
+# 	}
+# 	for my $attr ($part->findnodes('./attribute')) {
+# 		$schparts{$part->{name}}->{attributes}->{$attr->{name}} = $attr->{value};
+# # 		print '$schparts{'.$part->{name}.'}->{'.$attr->{name}.'} = '.$attr->{value}.";\n";
+# 		push @attrs, $attr->{name} unless $attr->{name} ~~ @attrs;
+# 	}
+# # 	die Dumper \$schparts{$part->{name}} if $part->{name} =~ /C7/;
+# }
+
+my %parts;
+
+for my $element ($brd->findnodes('/eagle/drawing/board/elements/element')) {
+	next if $element->{library} ~~ qw/testpad testpoint/ or $element->{package} ~~ qw/2PT_GND_TIE/;
+	$parts{$element->{name}} = {attributes => {}} unless $parts{$element->{name}};
+	for my $attr ($element->findnodes('./@*')) {
+		$parts{$element->{name}}->{$attr->nodeName} = $attr->value;
+	}
+	for my $attr ($element->findnodes('./attribute')) {
+		$parts{$element->{name}}->{attributes}->{$attr->{name}} = $attr->{value} if $attr->{value};
+		push @attrs, $attr->{name} unless $attr->{name} ~~ [@attrs,qw/NAME VALUE SF_SKU PROD_ID/];
+	}
+}
+
+# die Dumper \%parts;
+
+# die Dumper \@attrs;
+
+# die $descr{'D/' . $schparts{FB1}{library} . '/' . $schparts{FB1}{deviceset}};
+
+my %packval;
+
+for my $part (keys %parts) {
+	my $pv = join ":", @{$parts{$part}}{qw/value package library/}, @{$parts{$part}->{attributes}}{@attrs};
+# 	print $pv."\n";
+# 	die Dumper \@{$parts{$part}->{attributes}}{@attrs}, \@attrs if @parts{$part}->{attributes}{MF};
+	$packval{$pv} = [] unless defined $packval{$pv};
+	push @{$packval{$pv}}, $part;
+}
+
+my @columns = (qw(Qty Value Package Parts Library Description), sort @attrs);
+
+my @packval = sort {
+		@{$packval{$b}} <=> @{$packval{$a}}
+		or $parts{$packval{$a}->[0]}->{value} cmp $parts{$packval{$b}->[0]}->{value}
+		or $parts{$packval{$a}->[0]}->{package} cmp $parts{$packval{$b}->[0]}->{package}
+		or $parts{$packval{$a}->[0]}->{library} cmp $parts{$packval{$b}->[0]}->{library}
+	} keys %packval;
+
+printf '"%s"'."\n", join '","', @columns;
+
+for (@packval) {
+	my $desc;
+# 	print Dumper $parts{$packval{$_}->[0]};
+	$desc = $descr{'D/' . $parts{$packval{$_}->[0]}->{library} . '/' . $parts{$packval{$_}->[0]}->{deviceset}}
+		unless $desc;
+	do {
+		for my $pn (@{$packval{$_}}) {
+			$desc = $descr{'D/' . $schparts{$pn}{library} . '/' . $schparts{$pn}{deviceset}} if $schparts{$pn};
+		}
+	} unless $desc;
+	$desc = $descr{'P/' . $parts{$packval{$_}->[0]}->{library} . '/' . $parts{$packval{$_}->[0]}->{package}}
+		unless $desc;
+	$desc = $descr{'L/' . $parts{$packval{$_}->[0]}->{library}}
+		unless $desc;
+	$desc =~ s/\r?\n.*//s; $desc =~ s/<.*?>//g;
+	my %info = (
+		Qty => scalar(@{$packval{$_}}),
+		Value => $parts{$packval{$_}->[0]}->{value},
+		Package => $parts{$packval{$_}->[0]}->{package},
+		Parts => join(",", @{$packval{$_}}),
+		Library => $parts{$packval{$_}->[0]}->{library},
+		Description => $desc,
+		%{$parts{$packval{$_}->[0]}{attributes}},
+		);
+	printf '"%s"'."\n", join('","', @info{@columns});
+}
