@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# HOST=jeanelle.local
+HOST=192.168.1.97
+
+curl --header 'Content-Type: application/json' --data-binary '{ "id": 1, "jsonrpc": "2.0", "method": "Player.Stop", "params": { "playerid": 1 } }' $HOST:8080/jsonrpc; echo

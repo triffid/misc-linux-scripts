@@ -1,8 +1,44 @@
 #!/bin/bash
 
+# HOST=jeanelle.local
+HOST=192.168.1.97
+
 if [ -n "$1" ]
 then
-	curl --header 'Content-Type: application/json' --data-binary '{ "id": 1, "jsonrpc": "2.0", "method": "Player.Open", "params": {"item": { "file": "'"$1"'" } } }' jeanelle.local:8080/jsonrpc; echo
+	LIST=""
+	while [ -n "$1" ]
+	do
+		U="$1"
+		if [ -r "$U" ]
+		then
+			U=$( \
+				realpath "$U" \
+				| sed -e 's!^/mnt/storage!http://'"192.168.1.242"'!' \
+				| perl -pe 's/([\[\]\(\) ])/sprintf "%%%02X", ord($1)/ge' \
+			)
+		fi
+		if [[ "$U" =~ ^/mnt/storage ]] || [[ "$U" =~ ^https?:// ]]
+		then
+			if [ -n "$LIST" ]
+			then
+				LIST="$LIST, "
+			fi
+			LIST="$LIST{ \"file\": \"$U\" }"
+		else
+			echo "$1 ($U) not in appropriate location, skipping"
+		fi
+		shift
+	done
+	echo "Playing $LIST"
+	#jq . <<< '{ "id": 1, "jsonrpc": "2.0", "method": "Playlist.Add", "params": {"playlistid": 1, "item": ['"$LIST"'] } }'
+	curl --header 'Content-Type: application/json' --data-binary '{ "id": 1, "jsonrpc": "2.0", "method": "Player.Open", "params": { "item": '"$LIST"' } }' $HOST:8080/jsonrpc; echo
+
+
+# if [ -n "$1" ]
+# then
+# 	POST='{ "jsonrpc": "2.0", "method": "Player.Open", "params": {"item": { "file": "'"$1"'" } } }'
+# 	echo "$POST"
+# 	curl --header 'Content-Type: application/json' --data-binary "$POST" $HOST:8080/jsonrpc; echo
 else
 	echo "Usage: kodi-play <file or URL>"
 	exit 1
