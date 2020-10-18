@@ -48,6 +48,10 @@ vout = args.Vout
 es   = eseries[args.series]
 rat  = vout / vin
 
+if (vout > vin):
+	print("\nVout (%sv) cannot exceed Vin (%sv)! You need an op-amp or boost converter for that\n" % (siprefix(vout), siprefix(vin)))
+	exit(1)
+
 b = getbest(es, 10 ** ceil(log10(vin) - log10(vout)), 1) + getbest(es, 10 ** floor(log10(vin) - log10(vout)), 1)
 
 best = list(map(lambda b: [b[0], b[1], abs((b[2] * vin) - vout)], b))
