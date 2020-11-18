@@ -122,12 +122,51 @@ zip "${NAMEREV}-DesignFiles-Eagle7.zip" "${NAMEREV}-schematic.pdf" || exit 1
 
 LAYERS=$(eagle-brd-export-layercount "${NAMEREV}.brd")
 
-if [ -z "$CAMFILE" ]
+# if [ -z "$CAMFILE" ]
+# then
+# 	CAMFILE="$HOME/eagle/eagle-7_${LAYERS}layer.cam"
+# fi
+
+# Cam2Gerber.py -b "${NAMEREV}.brd" -c "$CAMFILE" -e "$(which eagle)" || exit 1
+
+eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_board_outline.gm1"              "${NAMEREV}.brd"  20
+eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_milling.gm2"                    "${NAMEREV}.brd"  46
+eagle -X -d"EXCELLON_24"      -o"${NAMEREV}_drills.txt"                     "${NAMEREV}.brd"  44
+eagle -X -d"EXCELLON_24"      -o"${NAMEREV}_drills-NPTH.txt"                "${NAMEREV}.brd"  45
+eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_silk.gto"          -W".whl" "${NAMEREV}.brd"  21 25 51
+eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_paste.gtp"         -W".whl" "${NAMEREV}.brd"  31
+eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_soldermask.gts"    -W".whl" "${NAMEREV}.brd"  29
+eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_copper.gtl"        -W".whl" "${NAMEREV}.brd"  1 17 18
+eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_silk.gbo"       -W".whl" "${NAMEREV}.brd"  22 26 52
+eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_paste.gbp"      -W".whl" "${NAMEREV}.brd"  32
+eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_soldermask.gbs" -W".whl" "${NAMEREV}.brd"  30
+eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_copper.gbl"     -W".whl" "${NAMEREV}.brd"  16 17 18
+if [ "$LAYERS" -eq 2 ]
 then
-	CAMFILE="$HOME/eagle/eagle-7_${LAYERS}layer.cam"
+	echo -n
+elif [ "$LAYERS" -eq 4 ]
+then
+	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18
+	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  15 17 18
+elif [ "$LAYERS" -eq 6 ]
+then
+	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18
+	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  3 17 18
+	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner3_copper.g3l" -W".whl" "${NAMEREV}.brd"  14 17 18
+	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner4_copper.g4l" -W".whl" "${NAMEREV}.brd"  15 17 18
+elif [ "$LAYERS" -eq 8 ]
+then
+	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18
+	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  3 17 18
+	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner3_copper.g3l" -W".whl" "${NAMEREV}.brd"  4 17 18
+	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner4_copper.g4l" -W".whl" "${NAMEREV}.brd"  13 17 18
+	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner5_copper.g5l" -W".whl" "${NAMEREV}.brd"  14 17 18
+	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner6_copper.g6l" -W".whl" "${NAMEREV}.brd"  15 17 18
+else
+	echo "Unknown number of layers: $LAYERS"
+	exit 1
 fi
 
-Cam2Gerber.py -b "${NAMEREV}.brd" -c "$CAMFILE" -e "$(which eagle)" || exit 1
 rm *dri *gpi
 
 zip "${NAMEREV}-GERBERS_AND_STENCIL.zip" "${NAMEREV}_"* || exit 1
