@@ -12,7 +12,7 @@ GREEN=$'\e[32m'
 RESETCOLOUR=$'\e[0m'
 
 function usage {
-	echo "Usage: ${0##*/} [-c chunksize] [-j concurrent downloads] [-o outfile] [-u username] [-C cookiejar] [-d delay] [--sha1sum checksum] [--sha256sum checksum] [--md5sum checksum] url"
+	echo "Usage: ${0##*/} [-c chunksize] [-j concurrent downloads] [-o outfile] [-u username] [-C cookiejar] [-d delay] [--sha1sum checksum] [--sha256sum checksum] [--md5sum checksum] url [curl options]"
 }
 
 if [ -z "$1" ]
@@ -25,7 +25,7 @@ trap 'kill 0' SIGINT
 trap 'kill 0' SIGTERM
 trap 'kill 0' SIGKILL
 
-while [ -n "$1" ]
+while [ -n "$1" ] && [ -z "$URL" ]
 do
 	case "$1" in
 		"-u")
@@ -93,6 +93,7 @@ function getonce() {
 		${COOKIEJAR:+-b "$COOKIEJAR"} \
 		-o "$CHUNKFN" \
 		--range $(($N * $CHUNKSIZE))-$((($N * $CHUNKSIZE) + $THISCHUNKSIZE - 1)) \
+		"$@" \
 		"$URL"
 }
 
@@ -138,7 +139,7 @@ then
 	read -s PASS
 fi
 
-SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - "$URL" | tee /dev/stderr | perl -ne 'BEGIN { $s = 0; } /Content-Length:\s*(\d+)/i && do { $s = $1 if $1 > $s }; /Content-Range:\s*bytes\s+(\d+)-(\d+)\/(\d+)/i && do { $s = $3 if $3 > $s; }; END { print "$s\n"; }')
+SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$@" "$URL" | tee /dev/stderr | perl -ne 'BEGIN { $s = 0; } /Content-Length:\s*(\d+)/i && do { $s = $1 if $1 > $s }; /Content-Range:\s*bytes\s+(\d+)-(\d+)\/(\d+)/i && do { $s = $3 if $3 > $s; }; END { print "$s\n"; }')
 
 if [ -z "$SIZE" ] || [ "$SIZE" -le 65536 ]
 then
