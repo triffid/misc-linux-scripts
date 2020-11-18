@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DOWNLOAD_LOG='tail -n8192 /var/log/emerge-fetch.log | grep "^>>>" | tail -n1; echo; tail -n4 /var/log/emerge-fetch.log; echo; echo;'
+DOWNLOAD_LOG='tail -n8192 /var/log/emerge-fetch.log | grep "^>>>" | tail -n1; echo; tail -n8 /var/log/emerge-fetch.log; echo; echo;'
 CURRENT_LOG='genlop -cn; echo;'
 HISTORY_LOG='tail -n10 /var/log/emerge.log | perl -pe "s/^(\d+)/localtime \$1/e"; echo; '
 
