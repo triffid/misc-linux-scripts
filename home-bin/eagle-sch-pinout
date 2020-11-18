@@ -38,6 +38,7 @@ for net in (r.findall('./drawing/schematic/sheets/sheet/nets/') + r.findall('./d
 					#if (rematch is not None):
 						#pinname = rematch.groups()[0]
 					pinname = re.sub(r'\!', 'n', pin)
+					pinname = re.sub(r'\.', '_', pin)
 					pinname = re.sub(r'\W.*', '', pinname)
 					pinname = re.sub(r'\W', 'x', pinname)
 					if (unn.search(pinname) is None):
