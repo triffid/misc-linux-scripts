@@ -81,7 +81,7 @@ for my $part ($sch->findnodes('/eagle/drawing/schematic/parts/part')) {
 # 		print Dumper \$attr->{name};
 		$schparts{$part->{name}}->{attributes}->{$attr->{name}} = $attr->{value};
 # 		print '$schparts{'.$part->{name}.'}->{'.$attr->{name}.'} = '.$attr->{value}.";\n";
-		push @attrs, $attr->{name} unless $attr->{name} ~~ @attrs;
+		push @attrs, $attr->{name} unless $attr->{name} ~~ [@attrs,qw/NAME VALUE SF_SKU PROD_ID/];
 	}
 # 	die Dumper \$schparts{$part->{name}} if $part->{name} =~ /C7/;
 }
