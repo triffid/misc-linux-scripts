@@ -18,9 +18,16 @@ r = e.getroot()
 descriptions = {}
 
 for l in r.findall('./drawing/board/libraries/'):
+	#pprint(l)
 	for p in l.findall('./packages/'):
 		if (p.find('./description') is not None):
 			descriptions["%s/%s"%(l.get('name'), p.get('name'))] = re.sub('<[^>]*>', '', p.find('./description').text.split('\n', 1)[0])
+	for p in l.findall('./devices/'):
+		if (p.find('./description') is not None):
+			descriptions["%s/%s"%(l.get('name'), p.get('name'))] = re.sub('<[^>]*>', '', p.find('./description').text.split('\n', 1)[0])
+
+#pprint(descriptions)
+#exit
 
 resultset = {}
 attrs = []
