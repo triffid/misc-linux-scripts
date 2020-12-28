@@ -95,7 +95,7 @@ zip "${NAMEREV}-DesignFiles-Eagle7.zip" "${NAMEREV}.sch" "${NAMEREV}.brd" || exi
 
 eagle -N- -C "
 	EDIT .sch;
-		print 100 -1 file ${NAMEREV}-schematic.pdf paper A3 sheets ALL landscape -caption -window -black -mirror -rotate -upsidedown;
+		print 100 -1 - file ${NAMEREV}-schematic.pdf paper A3 sheets ALL landscape;
 	EDIT .brd;
 		display none tNames tValues tPlace tDocu bNames bValues bPlace bDocu;
 		group all;
@@ -105,10 +105,10 @@ eagle -N- -C "
 		set color_layer dimension 15;
 		set color_layer tPlace 54; set color_layer tDocu 54; set color_layer tNames 7; set color_layer tValues 23; set color_layer tStop 55; set fill_layer tStop 11;
 		display none dimension pads tPlace tDocu tNames tValues tStop Measures;
-		print 100 -1 file ${NAMEREV}-Assembly-TOP.pdf    paper A4 sheets ALL landscape -mirror -caption -window -black -rotate -upsidedown;
+		print 100 -1 - file ${NAMEREV}-Assembly-TOP.pdf    paper A4 sheets ALL landscape;
 		set color_layer bPlace 54; set color_layer bDocu 54; set color_layer bNames 7; set color_layer bValues 23; set color_layer bStop 55; set fill_layer bStop 12;
 		display none dimension pads bPlace bDocu bNames bValues bStop;
-		print 100 -1 file ${NAMEREV}-Assembly-BOTTOM.pdf paper A4 sheets ALL landscape  mirror -caption -window -black -rotate -upsidedown;
+		print 100 -1 - file ${NAMEREV}-Assembly-BOTTOM.pdf paper A4 sheets ALL landscape mirror;
 	set confirm no;
 	quit;" \
 	"${NAMEREV}.sch"
