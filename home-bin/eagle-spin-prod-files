@@ -1,5 +1,7 @@
 #!/bin/bash
 
+EAGLE="${EAGLE:-eagle}"
+
 errormsg () {
 	echo -e "Error: \033[1m${1}!\033[0m"
 	echo
@@ -93,7 +95,7 @@ pushd "$O" >/dev/null || exit 1
 
 zip "${NAMEREV}-DesignFiles-Eagle7.zip" "${NAMEREV}.sch" "${NAMEREV}.brd" || exit 1
 
-eagle -N- -C "
+"$EAGLE" -N- -C "
 	EDIT .sch;
 		print 100 -1 - file ${NAMEREV}-schematic.pdf paper A3 sheets ALL landscape;
 	EDIT .brd;
@@ -129,39 +131,39 @@ LAYERS=$(eagle-brd-export-layercount "${NAMEREV}.brd")
 
 # Cam2Gerber.py -b "${NAMEREV}.brd" -c "$CAMFILE" -e "$(which eagle)" || exit 1
 
-eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_board_outline.gm1"              "${NAMEREV}.brd"  20
-eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_milling.gm2"                    "${NAMEREV}.brd"  46
-eagle -X -d"EXCELLON_24"      -o"${NAMEREV}_drills.txt"                     "${NAMEREV}.brd"  44
-eagle -X -d"EXCELLON_24"      -o"${NAMEREV}_drills-NPTH.txt"                "${NAMEREV}.brd"  45
-eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_silk.gto"          -W".whl" "${NAMEREV}.brd"  21 25 51
-eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_paste.gtp"         -W".whl" "${NAMEREV}.brd"  31
-eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_soldermask.gts"    -W".whl" "${NAMEREV}.brd"  29
-eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_copper.gtl"        -W".whl" "${NAMEREV}.brd"  1 17 18
-eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_silk.gbo"       -W".whl" "${NAMEREV}.brd"  22 26 52
-eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_paste.gbp"      -W".whl" "${NAMEREV}.brd"  32
-eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_soldermask.gbs" -W".whl" "${NAMEREV}.brd"  30
-eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_copper.gbl"     -W".whl" "${NAMEREV}.brd"  16 17 18
+"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_board_outline.gm1"              "${NAMEREV}.brd"  20
+"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_milling.gm2"                    "${NAMEREV}.brd"  46
+"$EAGLE" -X -d"EXCELLON_24"      -o"${NAMEREV}_drills.txt"                     "${NAMEREV}.brd"  44
+"$EAGLE" -X -d"EXCELLON_24"      -o"${NAMEREV}_drills-NPTH.txt"                "${NAMEREV}.brd"  45
+"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_silk.gto"          -W".whl" "${NAMEREV}.brd"  21 25 51
+"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_paste.gtp"         -W".whl" "${NAMEREV}.brd"  31
+"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_soldermask.gts"    -W".whl" "${NAMEREV}.brd"  29
+"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_copper.gtl"        -W".whl" "${NAMEREV}.brd"  1 17 18
+"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_silk.gbo"       -W".whl" "${NAMEREV}.brd"  22 26 52
+"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_paste.gbp"      -W".whl" "${NAMEREV}.brd"  32
+"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_soldermask.gbs" -W".whl" "${NAMEREV}.brd"  30
+"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_copper.gbl"     -W".whl" "${NAMEREV}.brd"  16 17 18
 if [ "$LAYERS" -eq 2 ]
 then
 	echo -n
 elif [ "$LAYERS" -eq 4 ]
 then
-	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18
-	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  15 17 18
+	"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18
+	"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  15 17 18
 elif [ "$LAYERS" -eq 6 ]
 then
-	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18
-	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  3 17 18
-	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner3_copper.g3l" -W".whl" "${NAMEREV}.brd"  14 17 18
-	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner4_copper.g4l" -W".whl" "${NAMEREV}.brd"  15 17 18
+	"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18
+	"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  3 17 18
+	"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner3_copper.g3l" -W".whl" "${NAMEREV}.brd"  14 17 18
+	"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner4_copper.g4l" -W".whl" "${NAMEREV}.brd"  15 17 18
 elif [ "$LAYERS" -eq 8 ]
 then
-	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18
-	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  3 17 18
-	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner3_copper.g3l" -W".whl" "${NAMEREV}.brd"  4 17 18
-	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner4_copper.g4l" -W".whl" "${NAMEREV}.brd"  13 17 18
-	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner5_copper.g5l" -W".whl" "${NAMEREV}.brd"  14 17 18
-	eagle -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner6_copper.g6l" -W".whl" "${NAMEREV}.brd"  15 17 18
+	"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18
+	"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  3 17 18
+	"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner3_copper.g3l" -W".whl" "${NAMEREV}.brd"  4 17 18
+	"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner4_copper.g4l" -W".whl" "${NAMEREV}.brd"  13 17 18
+	"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner5_copper.g5l" -W".whl" "${NAMEREV}.brd"  14 17 18
+	"$EAGLE" -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner6_copper.g6l" -W".whl" "${NAMEREV}.brd"  15 17 18
 else
 	echo "Unknown number of layers: $LAYERS"
 	exit 1
@@ -180,8 +182,7 @@ rm "${NAMEREV}_"*
 eagle-brd-export-bom "${NAMEREV}.brd" 2>/dev/null | head -n1 > "${NAMEREV}-BOM.csv"
 eagle-brd-export-bom "${NAMEREV}.brd" | tail -n+2 | sort -h -k 1.2 -r >> "${NAMEREV}-BOM.csv"
 
-unoconv -i FilterOptions=44,34,76 -o "${NAMEREV}-BOM.xlsx" "${NAMEREV}-BOM.csv" || true
-# libreoffice --convert-to xlsx "${NAMEREV}-BOM.csv" || true
+unoconv -i FilterOptions=44,34,76 -o "${NAMEREV}-BOM.xlsx" "${NAMEREV}-BOM.csv" || libreoffice --convert-to xlsx "${NAMEREV}-BOM.csv" || true
 
 ### Assembly
 
