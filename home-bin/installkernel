@@ -12,29 +12,50 @@ KERNELVER="$1"
 KERNELIMG="$2"
 KERNELDEST="$4"
 
-if ! [ -f "$KERNELIMG" ]
-then
-	echo "can't find $KERNELIMG"
-	exit 1
-fi
-
-if [ "$EUID" -ne 0 ]
-then
-	sudo "$0" "$@"
-	exit $?
-fi
-
-echo "*** Installing Modules"
-make modules_install || exit 1
-
-echo -n "*** Checking $KERNELDEST... "
-if ! mountpoint -q "$KERNELDEST"
-then
-	UNMOUNT=1
-	echo -n $'\e[1K\e[0G'"*** Mounting $KERNELDEST... "
-	mount "$KERNELDEST" || exit 1
-fi
-echo "OK"
+# if [ -z "$KERNELDEST" ]
+# then
+# 	KERNELDEST="/boot"
+# 	echo "Using default destination: $KERNELDEST"
+# fi
+#
+# if ! [ -f "$KERNELIMG" ]
+# then
+# 	echo "can't find $KERNELIMG"
+# 	exit 1
+# fi
+#
+# if [ "$EUID" -ne 0 ]
+# then
+# 	sudo "$0" "$@"
+# 	exit $?
+# fi
+#
+# if [ -e Kconfig ]
+# then
+# 	echo "*** Installing Modules"
+# 	make modules_install || exit 1
+# fi
+#
+# echo -n "*** Checking $KERNELDEST... "
+# if ! mountpoint -q "$KERNELDEST"
+# then
+# 	UNMOUNT=1
+# 	echo -n $'\e[1K\e[0G'"*** Mounting $KERNELDEST... "
+# 	mount "$KERNELDEST" || exit 1
+# fi
+# echo "OK"
+#
+# echo -n "*** Copying $KERNELIMG -> $KERNELDEST/kernel-$KERNELVER... "
+# cp "$KERNELIMG" "$KERNELDEST/kernel-$KERNELVER" || exit 1
+# echo "OK"
+#
+# if [ "$(readlink "$KERNELDEST/new")" != "kernel-$KERNELVER" ]
+# then
+# 	echo -n "*** Updating Links... "
+# 	mv -v "$KERNELDEST/new" "$KERNELDEST/old" || exit 1
+# 	ln -sv "kernel-$KERNELVER" "$KERNELDEST/new" || exit 1
+# 	echo "OK"
+# fi
 
 if [ -d /boot/EFI ]
 then
@@ -45,18 +66,6 @@ then
 		echo -n $'\e[1K\e[0G'"*** Mounting /boot/EFI... "
 		mount "/boot/EFI" || exit 1
 	fi
-	echo "OK"
-fi
-
-echo -n "*** Copying $KERNELIMG -> $KERNELDEST/kernel-$KERNELVER... "
-cp "$KERNELIMG" "$KERNELDEST/kernel-$KERNELVER" || exit 1
-echo "OK"
-
-if [ "$(readlink "$KERNELDEST/new")" != "kernel-$KERNELVER" ]
-then
-	echo -n "*** Updating Links... "
-	mv -v "$KERNELDEST/new" "$KERNELDEST/old" || exit 1
-	ln -sv "kernel-$KERNELVER" "$KERNELDEST/new" || exit 1
 	echo "OK"
 fi
 
@@ -78,9 +87,12 @@ then
 		echo -n "*** Unmounting /boot/EFI... "
 		umount "/boot/EFI" && echo "OK" || echo "Failed"
 	fi
-	echo -n "*** Unmounting $KERNELDEST... "
-	umount "$KERNELDEST" || exit 1
-	echo "OK"
+	if mountpoint -q "$KERNELDEST"
+	then
+		echo -n "*** Unmounting $KERNELDEST... "
+		umount "$KERNELDEST" || exit 1
+		echo "OK"
+	fi
 fi
 
 echo
