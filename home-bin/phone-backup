@@ -2,6 +2,8 @@
 
 SERIAL="$(lsusb -d 18d1:4ee7 -v 2>/dev/null | grep iSerial | awk '{ print $3; }')"
 
+adb -s $SERIAL shell 'cd /sdcard/DCIM/Camera; bash fix-pics.sh'
+
 cd ~/Private/DCIM/Camera
 
 for F in $(adb shell 'cd /sdcard/DCIM/Camera; ls -1 */*/*jpg')
