@@ -81,6 +81,8 @@ echo "Using $NAMEREV"
 
 O="$NAMEREV"
 
+ZIPNAME="$(date +%Y-%m-%d-)${NAMEREV}.zip"
+
 ### Generate working directory
 
 rm -rf "$O"
@@ -231,16 +233,16 @@ echo /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSI
 
 popd >/dev/null
 
-rm -f "${NAMEREV}.zip"
+rm -f "${ZIPNAME}"
 
-zip "${NAMEREV}.zip" "$O/${NAMEREV}-Board-Info.txt" "$O/${NAMEREV}-DesignFiles-Eagle7.zip" "$O/${NAMEREV}-schematic.pdf" "$O/${NAMEREV}-GERBERS_AND_STENCIL.zip" "$O/${NAMEREV}-Assembly.zip" "$O/${NAMEREV}-BOM.xlsx" "$O/${NAMEREV}-Manifest.txt" "$O/${NAMEREV}.csg.gz" "$O/${NAMEREV}-3D-TOP.png" "$O/${NAMEREV}-3D-BOTTOM.png"
+zip "${ZIPNAME}" "$O/${NAMEREV}-Board-Info.txt" "$O/${NAMEREV}-DesignFiles-Eagle7.zip" "$O/${NAMEREV}-schematic.pdf" "$O/${NAMEREV}-GERBERS_AND_STENCIL.zip" "$O/${NAMEREV}-Assembly.zip" "$O/${NAMEREV}-BOM.xlsx" "$O/${NAMEREV}-Manifest.txt" "$O/${NAMEREV}.csg.gz" "$O/${NAMEREV}-3D-TOP.png" "$O/${NAMEREV}-3D-BOTTOM.png"
 
 ### Generate Manifest
 
 for Z in {1..2}
 do
-	unzip -l "${NAMEREV}.zip" >> "$O/${NAMEREV}-Manifest.txt"
-	zip "${NAMEREV}.zip" "$O/${NAMEREV}-Manifest.txt"
+	unzip -l "${ZIPNAME}" >> "$O/${NAMEREV}-Manifest.txt"
+	zip "${ZIPNAME}" "$O/${NAMEREV}-Manifest.txt"
 done
 
 ### Notify completion
@@ -257,7 +259,7 @@ else
 fi
 
 echo
-echo -e "\033[32;1m${NAMEREV}.zip is ready\033[0m"
+echo -e "\033[32;1m${ZIPNAME} is ready\033[0m"
 echo
 
 exit 0
