@@ -2,14 +2,14 @@
 
 error() {
 	echo "\"$TEMP\": invalid temperature. Expected integer between 25 and 110"
-	exit 1	
+	exit 1
 }
 
 TEMP="$1"
 
 if [ -z "$TEMP" ]
 then
-	TEMP=85
+	TEMP=95
 fi
 
 if ! [[ "$TEMP" =~ [0-9]+ ]]
