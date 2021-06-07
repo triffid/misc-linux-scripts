@@ -131,96 +131,101 @@ function get() {
 FNAME=${FNAME:-${URL##*/}}
 FNAME=${FNAME:-index.html}
 
-echo "Downloading $FNAME from $URL"
-
-if [ -n "$USER" ]
+if [ -z "$ALLOK" ]
 then
-	echo -n "User $USER Password: "
-	read -s PASS
-fi
+	echo "Downloading $FNAME from $URL"
 
-SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$@" "$URL" | tee /dev/stderr | perl -ne 'BEGIN { $s = 0; } /Content-Length:\s*(\d+)/i && do { $s = $1 if $1 > $s }; /Content-Range:\s*bytes\s+(\d+)-(\d+)\/(\d+)/i && do { $s = $3 if $3 > $s; }; END { print "$s\n"; }')
-
-if [ -z "$SIZE" ] || [ "$SIZE" -le 65536 ]
-then
-	echo "Could not determine size, redirected?"
-	exit 1
-fi
-
-echo "Size is '$SIZE'"
-
-COUNT=$(($SIZE / $CHUNKSIZE))
-
-echo -n "$(($SIZE / $CHUNKSIZE))x$((CHUNKSIZE / 1048576))MB chunks"
-if [ $(($SIZE - (($SIZE / $CHUNKSIZE) * $CHUNKSIZE))) -eq 0 ]
-then
-	COUNT=$(($COUNT - 1))
-else
-	echo -n " and one $(($SIZE - (($SIZE / $CHUNKSIZE) * $CHUNKSIZE)))b chunk"
-fi
-echo " for $(($COUNT + 1)) total chunks"
-
-for I in $(seq -w 0 $COUNT)
-do
-	N=$((10#$I))
-	CURSIZE=0
-	CHUNKFN=".$FNAME.$I"
-
-	THISCHUNKSIZE=$CHUNKSIZE
-	if [ $N -eq $COUNT ]
+	if [ -n "$USER" ]
 	then
-		THISCHUNKSIZE=$(($SIZE - ($CHUNKSIZE * $N)))
-	fi
-	if [ $(cursize "$CHUNKFN") -lt $THISCHUNKSIZE ]
-	then
-		echo "Starting $CHUNKFN"
-		get "$I"
-		sleep $DELAY
+		echo -n "User $USER Password: "
+		read -s PASS
 	fi
 
-	while [ $(jobs -p | wc -l) -ge $JOBS ]
+	# SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$@" "$URL" | tee /dev/stderr | perl -ne 'BEGIN { $s = 0; } /Content-Length:\s*(\d+)/i && do { $s = $1 if $1 > $s }; /Content-Range:\s*bytes\s+(\d+)-(\d+)\/(\d+)/i && do { $s = $3 if $3 > $s; }; END { print "$s\n"; }')
+	SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$@" "$URL" | tee /dev/stderr | grep -i "^Content-Range:" | cut -d/ -f2 | tr -d $'\r')
+
+	echo "Size is '$SIZE'"
+
+	if [ -z "$SIZE" ] || [ "$SIZE" -le 65536 ]
+	then
+		echo "Could not determine size, redirected?"
+		exit 1
+	fi
+
+	COUNT=$(($SIZE / $CHUNKSIZE))
+
+	echo -n "$(($SIZE / $CHUNKSIZE))x$((CHUNKSIZE / 1048576))MB chunks"
+	if [ $(($SIZE - (($SIZE / $CHUNKSIZE) * $CHUNKSIZE))) -eq 0 ]
+	then
+		COUNT=$(($COUNT - 1))
+	else
+		echo -n " and one $(($SIZE - (($SIZE / $CHUNKSIZE) * $CHUNKSIZE)))b chunk"
+	fi
+	echo " for $(($COUNT + 1)) total chunks"
+
+	for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done')
 	do
-		wait -n
-	done
-done
+		N=$((10#$I))
+		CURSIZE=0
+		CHUNKFN=".$FNAME.$I"
 
-wait
-
-echo "All chunks finished"
-
-ALLOK=1
-
-PARTS=""
-
-for I in $(seq -w 0 $COUNT)
-do
-	N=$((10#$I))
-	CHUNKFN=".$FNAME.$I"
-	if [ -e "$CHUNKFN" ]
-	then
-		CURSIZE=$(stat -c "%s" "$CHUNKFN")
 		THISCHUNKSIZE=$CHUNKSIZE
 		if [ $N -eq $COUNT ]
 		then
 			THISCHUNKSIZE=$(($SIZE - ($CHUNKSIZE * $N)))
 		fi
-		if [ $CURSIZE -lt $THISCHUNKSIZE ]
+		if [ $(cursize "$CHUNKFN") -lt $THISCHUNKSIZE ]
 		then
-			echo "$CHUNKFN is incomplete! (Got $CURSIZE of $CHUNKSIZE bytes) Run $0 again"
+			echo "Starting $CHUNKFN"
+			get "$I"
+			sleep $DELAY
+		fi
+
+		while [ $(jobs -p | wc -l) -ge $JOBS ]
+		do
+			wait -n
+		done
+	done
+
+	wait
+
+	echo "All chunks finished"
+
+	ALLOK=1
+
+	PARTS=""
+
+	for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done')
+	do
+		N=$((10#$I))
+		CHUNKFN=".$FNAME.$I"
+		if [ -e "$CHUNKFN" ]
+		then
+			CURSIZE=$(stat -c "%s" "$CHUNKFN")
+			THISCHUNKSIZE=$CHUNKSIZE
+			if [ $N -eq $COUNT ]
+			then
+				THISCHUNKSIZE=$(($SIZE - ($CHUNKSIZE * $N)))
+			fi
+			if [ $CURSIZE -lt $THISCHUNKSIZE ]
+			then
+				echo "$CHUNKFN is incomplete! (Got $CURSIZE of $CHUNKSIZE bytes) Run $0 again"
+				ALLOK=0
+			fi
+		else
+			echo "$CHUNKFN is missing! Run $0 again"
 			ALLOK=0
 		fi
-	else
-		echo "$CHUNKFN is missing! Run $0 again"
-		ALLOK=0
-	fi
-done
+	done
+fi
 
-if [ $ALLOK -eq 1 ]
+if [ "$ALLOK" -eq 1 ]
 then
-	for I in $(seq -w 0 $COUNT)
+	for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done')
 	do
 		echo $'\e[0G\e[1A\e[2K'"Assembling $FNAME... $I/$COUNT"
-		dd if=".$FNAME.$I" of="$FNAME" bs=${CHUNKSIZE} count=1 seek=$((10#$I)) &>/dev/null
+		# dd if=".$FNAME.$I" of="$FNAME" bs=${CHUNKSIZE} count=1 seek=$((10#$I)) &>/dev/null
+		dd if=".$FNAME.$I" of="$FNAME" bs=${CHUNKSIZE} count=1 seek=$((10#$I)) &>/dev/null && rm ".$FNAME.$I"
 	done
 	echo "${GREEN}${FNAME} successfully generated.${RESETCOLOUR}"
 
@@ -260,7 +265,7 @@ then
 		fi
 	fi
 
-	rm $(for I in $(seq -w 0 $COUNT); do echo ".$FNAME.$I"; done)
+	# rm $(for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done'); do echo ".$FNAME.$I"; done)
 else
 	rm "$FNAME"
 	exit 1
