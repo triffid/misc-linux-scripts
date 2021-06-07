@@ -2,6 +2,11 @@
 
 EAGLE="${EAGLE:-eagle}"
 
+if which xvfb-run
+do
+	EAGLE="xvfb-run $EAGLE"
+done
+
 errormsg () {
 	echo -e "Error: \033[1m${1}!\033[0m"
 	echo
