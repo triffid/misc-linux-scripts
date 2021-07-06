@@ -24,6 +24,7 @@ for l in r.findall('./drawing/board/libraries/'):
 			descriptions["%s/%s"%(l.get('name'), p.get('name'))] = re.sub('<[^>]*>', '', p.find('./description').text.split('\n', 1)[0])
 	for p in l.findall('./devices/'):
 		if (p.find('./description') is not None):
+			print("%s/%s"%(l.get('name'), p.get('name')))
 			descriptions["%s/%s"%(l.get('name'), p.get('name'))] = re.sub('<[^>]*>', '', p.find('./description').text.split('\n', 1)[0])
 
 #pprint(descriptions)
@@ -33,7 +34,7 @@ resultset = {}
 attrs = []
 
 for e in r.findall('./drawing/board/elements/'):
-	if (e.attrib['library'] not in ('testpad', 'testpoint') and e.get('package') not in ('2PT_GND_TIE',)):
+	if (e.attrib['library'] not in ('testpad', 'testpoint','TC2030') and e.get('package') not in ('2PT_GND_TIE',)):
 		attr_dict = {}
 		attr_str  = ""
 		for a in sorted(e.findall('./'), key=lambda n: str.lower(n.attrib['name'])):
@@ -56,7 +57,7 @@ rows = []
 
 attrl = sorted(attrs, key=str.lower)
 
-print('"' + '","'.join(['Qty','Value','Package','Parts','Description'] + attrl) + '"')
+print('"' + '","'.join(['Qty','Value','Package','Parts'] + attrl) + '"')
 
 for gn in sorted(resultset):
 	rows += [gn]
@@ -70,4 +71,4 @@ for row in rows:
 	for a in attrl:
 		#print("%s:%s" % (a, attrs.get(a, '')))
 		attr += [attrs.get(a, '')]
-	print('"' + '","'.join([str(qty), value, package, names, description] + attr) + '"')
+	print('"' + '","'.join([str(qty), value, package, names] + attr) + '"')
