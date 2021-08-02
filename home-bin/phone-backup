@@ -6,7 +6,8 @@ adb -s $SERIAL shell 'cd /sdcard/DCIM/Camera; bash fix-pics.sh'
 
 cd ~/Private/DCIM/Camera
 
-for F in $(adb shell 'cd /sdcard/DCIM/Camera; ls -1 */*/*jpg')
+# for F in $(adb shell "cd /sdcard/DCIM/Camera; find . -type f -iname '*.mp4' -or -iname '*.jpg' | grep '^./20'")
+for F in $(adb shell "cd /sdcard/DCIM/Camera; find . -type f -iname '*.jpg' | grep '^./20'")
 do
 	if ! [ -e "$F" ]
 	then
