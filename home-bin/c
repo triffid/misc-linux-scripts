@@ -13,11 +13,14 @@ cat <<'ENDHEAD' > "$TEMP"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <inttypes.h>
 
 #include <iostream>
 #include <string>
 #include <cstring>
 #include <functional>
+#include <array>
+#include <vector>
 
 int main(int argc, char** argv)
 {
@@ -37,7 +40,12 @@ done
 
 if [[ "$#" -gt 0 ]]
 then
-	echo $'\t'"$@" >> "$TEMP"
+	#echo $'\t'"$@" >> "$TEMP"
+	while [[ "$#" -gt 0 ]]
+	do
+		echo $'\t'"$1" >> "$TEMP"
+		shift
+	done
 else
 	cat >> "$TEMP"
 fi
