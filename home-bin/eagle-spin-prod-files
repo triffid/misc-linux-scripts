@@ -2,23 +2,50 @@
 
 EAGLE="${EAGLE:-eagle}"
 
+# from https://stackoverflow.com/a/30336424 because xvfb-run really doesn't like parallel start
+function xvfb-run-safe() {
+	# allow settings to be updated via environment
+	: "${xvfb_lockdir:=$HOME/.xvfb-locks}"
+	: "${xvfb_display_min:=99}"
+	: "${xvfb_display_max:=599}"
+
+	# assuming only one user will use this, let's put the locks in our own home directory
+	# avoids vulnerability to symlink attacks.
+	mkdir -p -- "$xvfb_lockdir" || exit 1
+
+	i=$xvfb_display_min     # minimum display number
+	while (( i < xvfb_display_max )); do
+		# still avoid an obvious open display
+		if [ -f "/tmp/.X$i-lock" ]; then
+			(( ++i )); continue
+		fi
+		( flock -n 5 || exit 1; xvfb-run --server-num="$i" "$@" ) 5>"$xvfb_lockdir/$i" && return;
+		(( i++ ))
+	done
+}
+
 if which xvfb-run
 then
-	EAGLE="xvfb-run $EAGLE"
+	EAGLE="xvfb-run-safe $EAGLE"
 fi
 
+TAB=$'\t'
+BOLD=$'\033[1m'
+NORM=$'\033[0m'
+GREEN=$'\033[32m'
+
 errormsg () {
-	echo -e "Error: \033[1m${1}!\033[0m"
+	echo -e "Error: ${BOLD}${1}!${NORM}"
 	echo
-	echo "Usage: $0 [-n] [-c|--cam cam-job-file] <revision> [file.sch]"
+	echo "Usage: $0 [-n|-d] <revision> [file.sch]"
 	echo
-	echo $'\t-d\t'"Delete temporary working directory after successful completion."
+	echo "${TAB}-n${TAB}Don't delete temporary working directory after successful completion. (default)"
+	echo "${TAB}-d${TAB}Delete temporary working directory after successful completion."
 	echo
-	echo $'\t-c\t'"Use a specific CAM job rather than the auto-detected one."
+	echo "${TAB}revision: The revision name to use when generating output files."
 	echo
-	echo $'\t'"revision: The revision name to use when generating output files."
-	echo
-	echo $'\t'"file.sch: The eagle schematic to operate on. Defaults to most recently altered in current directory."
+	echo "${TAB}file.sch: The eagle schematic to operate on."
+	echo "${TAB}          Defaults to most recently altered in current directory."
 	echo
 	echo "Example: ${0##*/} rev3"
 	echo
@@ -39,16 +66,6 @@ do
 			unset NODELETE
 			shift
 			;;
-		-c|--cam)
-			CAMFILE="$2"
-			if [ ! -r "$CAMFILE" ]
-			then
-				echo "Error: cannot read '$CAMFILE'" >&2
-				exit 1
-			fi
-			shift
-			shift
-			;;
 	esac
 done
 
@@ -62,8 +79,9 @@ then
 	SCHEMATIC="$(/bin/ls -1rt *sch | tail -n1)"
 fi
 
-BOARD="${SCHEMATIC%%.sch}.brd"
 NAME="${SCHEMATIC%%.sch}"
+
+BOARD="${NAME}.brd"
 
 if [ -z "$SCHEMATIC" ] || [ ! -r "$SCHEMATIC" ]
 then
@@ -85,8 +103,6 @@ NAMEREV="${NAME}-${REV}"
 echo "Using $NAMEREV"
 
 O="$NAMEREV"
-
-ZIPNAME="$(date +%Y-%m-%d-)${NAMEREV}.zip"
 
 ### Generate working directory
 
@@ -122,59 +138,51 @@ $EAGLE -N- -C "
 	quit;" \
 	"${NAMEREV}.sch"
 
-pdfunite "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf" "${NAMEREV}-Assembly.pdf" && rm "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf"
-
-
-zip "${NAMEREV}-DesignFiles-Eagle7.zip" "${NAMEREV}-schematic.pdf" || exit 1
-
 ### Gerbers
 
 LAYERS=$(eagle-brd-export-layercount "${NAMEREV}.brd")
 
-# if [ -z "$CAMFILE" ]
-# then
-# 	CAMFILE="$HOME/eagle/eagle-7_${LAYERS}layer.cam"
-# fi
-
-# Cam2Gerber.py -b "${NAMEREV}.brd" -c "$CAMFILE" -e "$(which eagle)" || exit 1
-
-$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_board_outline.gm1"              "${NAMEREV}.brd"  20
-$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_milling.gm2"                    "${NAMEREV}.brd"  46
-$EAGLE -X -d"EXCELLON_24"      -o"${NAMEREV}_drills.txt"                     "${NAMEREV}.brd"  44
-$EAGLE -X -d"EXCELLON_24"      -o"${NAMEREV}_drills-NPTH.txt"                "${NAMEREV}.brd"  45
-$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_silk.gto"          -W".whl" "${NAMEREV}.brd"  21 25 51
-$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_paste.gtp"         -W".whl" "${NAMEREV}.brd"  31
-$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_soldermask.gts"    -W".whl" "${NAMEREV}.brd"  29
-$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_copper.gtl"        -W".whl" "${NAMEREV}.brd"  1 17 18
-$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_silk.gbo"       -W".whl" "${NAMEREV}.brd"  22 26 52
-$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_paste.gbp"      -W".whl" "${NAMEREV}.brd"  32
-$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_soldermask.gbs" -W".whl" "${NAMEREV}.brd"  30
-$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_copper.gbl"     -W".whl" "${NAMEREV}.brd"  16 17 18
+$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_board_outline.gm1"              "${NAMEREV}.brd"  20       &
+$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_milling.gm2"                    "${NAMEREV}.brd"  46       &
+$EAGLE -N- -X -d"EXCELLON_24"      -o"${NAMEREV}_drills.txt"                     "${NAMEREV}.brd"  44       &
+$EAGLE -N- -X -d"EXCELLON_24"      -o"${NAMEREV}_drills-NPTH.txt"                "${NAMEREV}.brd"  45       &
+$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_silk.gto"          -W".whl" "${NAMEREV}.brd"  21 25 51 &
+$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_paste.gtp"         -W".whl" "${NAMEREV}.brd"  31       &
+$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_soldermask.gts"    -W".whl" "${NAMEREV}.brd"  29       &
+$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_top_copper.gtl"        -W".whl" "${NAMEREV}.brd"  1 17 18  &
+$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_silk.gbo"       -W".whl" "${NAMEREV}.brd"  22 26 52 &
+$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_paste.gbp"      -W".whl" "${NAMEREV}.brd"  32       &
+$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_soldermask.gbs" -W".whl" "${NAMEREV}.brd"  30       &
+$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_bottom_copper.gbl"     -W".whl" "${NAMEREV}.brd"  16 17 18 &
 if [ "$LAYERS" -eq 2 ]
 then
-	echo -n
+	true
 elif [ "$LAYERS" -eq 4 ]
 then
-	$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18
-	$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  15 17 18
+	$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18  &
+	$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  15 17 18 &
 elif [ "$LAYERS" -eq 6 ]
 then
-	$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18
-	$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  3 17 18
-	$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner3_copper.g3l" -W".whl" "${NAMEREV}.brd"  14 17 18
-	$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner4_copper.g4l" -W".whl" "${NAMEREV}.brd"  15 17 18
+	$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18  &
+	$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  3 17 18  &
+	$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner3_copper.g3l" -W".whl" "${NAMEREV}.brd"  14 17 18 &
+	$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner4_copper.g4l" -W".whl" "${NAMEREV}.brd"  15 17 18 &
 elif [ "$LAYERS" -eq 8 ]
 then
-	$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18
-	$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  3 17 18
-	$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner3_copper.g3l" -W".whl" "${NAMEREV}.brd"  4 17 18
-	$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner4_copper.g4l" -W".whl" "${NAMEREV}.brd"  13 17 18
-	$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner5_copper.g5l" -W".whl" "${NAMEREV}.brd"  14 17 18
-	$EAGLE -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner6_copper.g6l" -W".whl" "${NAMEREV}.brd"  15 17 18
+	$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner1_copper.g1l" -W".whl" "${NAMEREV}.brd"  2 17 18  &
+	$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner2_copper.g2l" -W".whl" "${NAMEREV}.brd"  3 17 18  &
+	$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner3_copper.g3l" -W".whl" "${NAMEREV}.brd"  4 17 18  &
+	$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner4_copper.g4l" -W".whl" "${NAMEREV}.brd"  13 17 18 &
+	$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner5_copper.g5l" -W".whl" "${NAMEREV}.brd"  14 17 18 &
+	$EAGLE -N- -X -d"GERBER_RS274X_24" -o"${NAMEREV}_inner6_copper.g6l" -W".whl" "${NAMEREV}.brd"  15 17 18 &
 else
 	echo "Unknown number of layers: $LAYERS"
 	exit 1
 fi
+
+wait
+
+zip "${NAMEREV}-DesignFiles-Eagle7.zip" "${NAMEREV}-schematic.pdf" || exit 1
 
 rm *dri *gpi
 
@@ -193,9 +201,20 @@ unoconv -i FilterOptions=44,34,76 -o "${NAMEREV}-BOM.xlsx" "${NAMEREV}-BOM.csv" 
 
 ### Assembly
 
-eagle-brd-export-assembly "${NAMEREV}.brd" > "${NAMEREV}-Assembly.txt"
+pdfunite "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf" "${NAMEREV}-Assembly.pdf" && rm "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf"
 
-zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly.txt" "${NAMEREV}-Assembly.pdf"
+# eagle-brd-export-assembly "${NAMEREV}.brd" > "${NAMEREV}-Assembly.txt"
+eagle-brd-export-assembly "${NAMEREV}.brd" | grep -v 'MR' > "${NAMEREV}-Assembly-TOP.txt"
+
+eagle-brd-export-assembly "${NAMEREV}.brd" | head -n2     >  "${NAMEREV}-Assembly-BOTTOM.txt"
+eagle-brd-export-assembly "${NAMEREV}.brd" | grep    'MR' >> "${NAMEREV}-Assembly-BOTTOM.txt"
+
+# zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly.txt" "${NAMEREV}-Assembly.pdf"
+# zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly-TOP.txt" "${NAMEREV}-Assembly-BOTTOM.txt" "${NAMEREV}-Assembly.pdf"
+zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly.pdf"
+
+[[ $(wc -l "${NAMEREV}-Assembly-TOP.txt")    -gt 2 ]] && zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly-TOP.txt"
+[[ $(wc -l "${NAMEREV}-Assembly-BOTTOM.txt") -gt 2 ]] && zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly-BOTTOM.txt"
 
 ### Manifest
 
@@ -228,15 +247,21 @@ then
 fi
 
 echo /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,15,0,$(( $ROT + 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-TOP.png" "${NAMEREV}.scad"
-/usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,15,0,$(( $ROT + 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-TOP.png" "${NAMEREV}.scad" 2>&1 | grep -v '^Trimming cache:'
+( /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,15,0,$(( $ROT + 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-TOP.png" "${NAMEREV}.scad" 2>&1 | grep -v '^Trimming cache:'; ) &
 echo /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,195,0,$(( $ROT - 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-BOTTOM.png" "${NAMEREV}.scad"
-/usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,195,0,$(( $ROT - 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-BOTTOM.png" "${NAMEREV}.scad" 2>&1 | grep -v '^Trimming cache:'
+( /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,195,0,$(( $ROT - 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-BOTTOM.png" "${NAMEREV}.scad" 2>&1 | grep -v '^Trimming cache:'; ) &
 
-/usr/bin/openscad -o "${NAMEREV}.csg" "${NAMEREV}.scad" && gzip < "${NAMEREV}.csg" > "${NAMEREV}.csg.gz" && rm "${NAMEREV}.csg"
+( /usr/bin/openscad -o "${NAMEREV}.csg" "${NAMEREV}.scad"; ) &
+
+wait
+
+gzip < "${NAMEREV}.csg" > "${NAMEREV}.csg.gz" && rm "${NAMEREV}.csg"
 
 ### Construct production zip
 
 popd >/dev/null
+
+ZIPNAME="$(date +%Y-%m-%d-)${NAMEREV}.zip"
 
 rm -f "${ZIPNAME}"
 
@@ -264,7 +289,7 @@ else
 fi
 
 echo
-echo -e "\033[32;1m${ZIPNAME} is ready\033[0m"
+echo -e "${GREEN}${BOLD}${ZIPNAME} is ready${NORMAL}"
 echo
 
 exit 0
