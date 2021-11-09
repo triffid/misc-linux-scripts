@@ -204,17 +204,17 @@ unoconv -i FilterOptions=44,34,76 -o "${NAMEREV}-BOM.xlsx" "${NAMEREV}-BOM.csv" 
 pdfunite "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf" "${NAMEREV}-Assembly.pdf" && rm "${NAMEREV}-Assembly-TOP.pdf" "${NAMEREV}-Assembly-BOTTOM.pdf"
 
 # eagle-brd-export-assembly "${NAMEREV}.brd" > "${NAMEREV}-Assembly.txt"
-eagle-brd-export-assembly "${NAMEREV}.brd" | grep -v 'MR' > "${NAMEREV}-Assembly-TOP.txt"
+eagle-brd-export-assembly "${NAMEREV}.brd" | egrep -v '\bMR\d'  > "${NAMEREV}-Assembly-TOP.txt"
 
-eagle-brd-export-assembly "${NAMEREV}.brd" | head -n2     >  "${NAMEREV}-Assembly-BOTTOM.txt"
-eagle-brd-export-assembly "${NAMEREV}.brd" | grep    'MR' >> "${NAMEREV}-Assembly-BOTTOM.txt"
+eagle-brd-export-assembly "${NAMEREV}.brd" | head -n2           > "${NAMEREV}-Assembly-BOTTOM.txt"
+eagle-brd-export-assembly "${NAMEREV}.brd" | egrep    '\bMR\d' >> "${NAMEREV}-Assembly-BOTTOM.txt"
 
 # zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly.txt" "${NAMEREV}-Assembly.pdf"
 # zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly-TOP.txt" "${NAMEREV}-Assembly-BOTTOM.txt" "${NAMEREV}-Assembly.pdf"
 zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly.pdf"
 
-[[ $(wc -l "${NAMEREV}-Assembly-TOP.txt")    -gt 2 ]] && zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly-TOP.txt"
-[[ $(wc -l "${NAMEREV}-Assembly-BOTTOM.txt") -gt 2 ]] && zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly-BOTTOM.txt"
+[ $(wc -l < "${NAMEREV}-Assembly-TOP.txt")    -gt 2 ] && zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly-TOP.txt"
+[ $(wc -l < "${NAMEREV}-Assembly-BOTTOM.txt") -gt 2 ] && zip "${NAMEREV}-Assembly.zip" "${NAMEREV}-Assembly-BOTTOM.txt"
 
 ### Manifest
 
