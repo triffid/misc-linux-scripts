@@ -63,8 +63,8 @@ fi
 while [ -s "$1" ]
 do
 	echo Posting "$1"
-	until ( curl -\# -H 'Authorization: Bearer '$AUTHKEY -F 'image=@'"$1" $ALBUMARGS https://api.imgur.com/3/upload |\
-		perl -MJSON::PP -MData::Dumper -ne 'my %a = %{decode_json($_)} or die "$!"; die "Empty response, upload failed" unless keys %a; if ($a{data}->{error}) { die "Error: %s\n", $a{data}->{error}; } my $fn = $a{data}->{link}; $fn =~ s!.*/!!; printf "echo \"Success! %s %dx%d, id %s, link %s\"\nln -s \"'$1'\" \"imgur-%s\"", (("'$ALBUM'")?"[Album: '$ALBUM']":""), $a{data}->{width}, $a{data}->{height}, $a{data}->{id}, $a{data}->{link}, $fn;' | bash; exit ${PIPESTATUS[0]}; )
+	until ( curl -\# -H 'Authorization: Bearer '$AUTHKEY -F 'image=@"'"$1"'"' $ALBUMARGS https://api.imgur.com/3/upload |\
+		perl -MJSON::PP -MData::Dumper -ne 'my %a = %{decode_json($_)} or die "$!"; die "Empty response, upload failed" unless keys %a; if ($a{data}->{error}) { die "Error: %s\n", $a{data}->{error}; } my $fn = $a{data}->{link}; $fn =~ s!.*/!!; printf "echo \"Success! %s %dx%d, id %s, link %s\"\nln -s \"'"$1"'\" \"imgur-%s\"", (("'$ALBUM'")?"[Album: '$ALBUM']":""), $a{data}->{width}, $a{data}->{height}, $a{data}->{id}, $a{data}->{link}, $fn;' | bash; exit ${PIPESTATUS[0]}; )
 	do
 		sleep 1
 		echo "[Retry] $1"
