@@ -88,4 +88,4 @@ for i in range(args.results):
 	vi = vout / rat
 	erri = (vi - vin) * 100 / vin
 	print("\tR1 = %sΩ\tR2 = %sΩ\n\t\tVin  %sv -> Vout %sv (%sv %+2.1f%%)\n\t\tVout %sv -> Vin  %sv (%sv %+2.1f%%)"%(siprefix(r1), siprefix(r2), siprefix(vin), siprefix(vo), siprefix(vout), erro, siprefix(vout), siprefix(vout / rat), siprefix(vin), erri))
-	print("\t\tThevenin Impedance: %sΩ\tCurrent: %sA\tPower: %sW"%(siprefix(thev), siprefix(curr), siprefix(powr)))
+	print("\t\tThévenin Impedance: %sΩ\tCurrent: %sA\tPower: %sW"%(siprefix(thev), siprefix(curr), siprefix(powr)))
