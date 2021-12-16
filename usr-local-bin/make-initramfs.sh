@@ -122,6 +122,7 @@ function errorshell() {
 mount -t proc     -o nodev,nosuid,noexec none /proc    || errorshell "Failed to mount /proc"
 mount -t sysfs    -o nodev,nosuid,noexec none /sys     || errorshell "Failed to mount /sys"
 mount -t devtmpfs -o nosuid,noexec       none /dev     || errorshell "Failed to mount /dev"
+mkdir -p /dev/pts /dev/shm
 mount -t devpts   -o nosuid,noexec       none /dev/pts || errorshell "Failed to mount /dev/pts"
 mount -t tmpfs    -o nodev,nosuid,noexec none /dev/shm || errorshell "Failed to mount /dev/shm"
 
@@ -145,20 +146,21 @@ then
     LUKSHEADER="$(getvar luksheader)"
 fi
 
-ROOT=/dev/mapper/root
-if [ -n "$(getvar root)" ]
-then
-    ROOT="$(getvar root)"
-fi
+# if [ -n "$(getvar root)" ]
+# then
+#     ROOT="$(getvar root)"
+# fi
 
-while ! cryptsetup open "$LUKS" "${LUKSHEADER:+--header $LUKSHEADER}" root
+while ! cryptsetup open "$LUKS" ${LUKSHEADER:+--header $LUKSHEADER} root
 do
     echo "${BOLD}Error: ${RED}cryptsetup failed!$NORMAL"
     echo
     sleep 3
-    echo -n "Try again? "
-    read || errorshell "cryptsetup failed, user bailed!"
+    echo -n "Try again? [Y/n] "
+    read
+    [[ "$REPLY" =~ '^[nN]' ]] && errorshell "cryptsetup failed, user bailed!"
 done
+ROOT=/dev/mapper/root
 
 if [ -n "$(getvar rootfstype)" ]
 then
@@ -183,7 +185,7 @@ umount /dev
 umount /sys
 umount /proc
 
-switch_root /mnt /sbin/init || errorshell "Failed to switch_root"
+exec switch_root /mnt /sbin/init || errorshell "Failed to switch_root"
 ENDSCRIPT
 
 chmod +x "$INITRAMFS_DIR/init"
