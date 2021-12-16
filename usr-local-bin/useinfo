@@ -4,7 +4,8 @@
 # This software is licensed under the GNU GPL
 # available at http://www.gnu.org/copyleft/gpl.html
 
-while [[ -n $1 ]]; do
-	grep -h $1 /var/db/repos/*/profiles/use.*
+while [[ -n "$1" ]]; do
+	egrep -h "\b$1\b" /var/db/repos/*/profiles/use.*
+	find /var/db/repos -name metadata.xml -exec grep "name=\"$1\"" {} + | sed -En 's!/var/db/repos/([^/]+)/([^/]+/[^/]+)/metadata.xml:.*name="([^"]+)"[^>]*>([^<]+)<.*!\2::\1\n\t\3: \4!p'
 	shift
 done
