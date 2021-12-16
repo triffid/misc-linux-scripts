@@ -69,11 +69,14 @@ then
 	echo "OK"
 fi
 
-if [ -d /boot/EFI/EFI/linux ]
+if [ -d /boot/EFI/linux ]
 then
-	echo -n "*** Copying $KERNELIMG -> /boot/EFI/EFI/linux/linux.efi... "
-	cp "$KERNELIMG" "/boot/EFI/EFI/linux/linux.efi" || exit 1
+	echo -n "*** Copying $KERNELIMG -> /boot/EFI/linux/linux.efi... "
+	cp "$KERNELIMG" "/boot/EFI/linux/linux.efi" || exit 1
 	echo "OK"
+else
+	echo "Can't find /boot/EFI/linux, I don't know where to put the kernel!"
+	exit 1
 fi
 
 echo -n "*** Setting linux.efi as next boot... "
