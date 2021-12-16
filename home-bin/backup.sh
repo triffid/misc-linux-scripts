@@ -19,7 +19,7 @@ for F in *
 do
     termtitle "Rsyncing $F"
     echo "*** $F *** rsync -avhszP --delete --link-dest="../../${PREFIX##*/}1/$F" "$F/" "${REMOTEHOST}:${PREFIX}0/$F""
-    rsync -avvhszP --delete --link-dest="../../${PREFIX##*/}1/$F" "$F/" "${REMOTEHOST}:${PREFIX}0/$F" || exit 1
+    rsync -ahvsP --delete --link-dest="../../${PREFIX##*/}1/$F" "$F/" "${REMOTEHOST}:${PREFIX}0/$F" || exit 1
 done
 
 ssh "$REMOTEHOST" "touch ${PREFIX}0"
