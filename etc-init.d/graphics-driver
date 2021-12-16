@@ -12,41 +12,46 @@
 #     emerge nvidia-drivers && service graphics-driver restore when updating your drivers and kernel
 #     make xdm depend on this
 
-extra_commands="save restore"
+# extra_commands="save restore"
 
-CURRENTVER=$(cd /var/db/pkg/x11-drivers/; echo nvidia-drivers-* | sed -E 's/\-r[0-9]+$//')
-KERNELVER=$(< /sys/module/nvidia/version)
+# CURRENTVER=$(cd /var/db/pkg/x11-drivers/; echo nvidia-drivers-* | sed -E 's/\-r[0-9]+$//')
+# KERNELVER=$(< /sys/module/nvidia/version)
 
 depend() {
-	need localmount modules
+	need localmount
 	before xdm
 }
 
-restore() {
-	if [ ! -f "/usr/portage/packages/x11-drivers/${CURRENTVER}.tbz2" ]
-	then
-		save
-	fi
-	if [ ! -d "/var/db/pkg/x11-drivers/nvidia-drivers-${KERNELVER}" ]
-	then
-		emerge -Ku1Oq "~x11-drivers/nvidia-drivers-${KERNELVER}"
-	fi
-}
+#restore() {
+#	if [ ! -f "/usr/portage/packages/x11-drivers/${CURRENTVER}.tbz2" ]
+#	then
+#		save
+#	fi
+#	if [ ! -d "/var/db/pkg/x11-drivers/nvidia-drivers-${KERNELVER}" ]
+#	then
+#		emerge -Ku1Oq "~x11-drivers/nvidia-drivers-${KERNELVER}"
+#	fi
+#}
 
-save() {
-	quickpkg --include-config=y x11-drivers/nvidia-drivers
-}
+#save() {
+#	quickpkg --include-config=y x11-drivers/nvidia-drivers
+#}
 
 start() {
-	if [ "$CURRENTVER" != "$KERNELVER" ]
+#	if [ "$CURRENTVER" != "$KERNELVER" ]
+#	then
+#		restore
+#	fi
+	if emerge -u1KO nvidia-drivers && lsmod | grep -q nvidia && ! nvidia-smi
 	then
-		restore
+		rmmod nvidia_drm nvidia_modeset nvidia && modprobe nvidia
 	fi
 }
 
 stop() {
-	if [ ! -f "/usr/portage/packages/x11-drivers/${CURRENTVER}.tbz2" ]
-	then
-		save
-	fi
+#	if [ ! -f "/usr/portage/packages/x11-drivers/${CURRENTVER}.tbz2" ]
+#	then
+#		save
+#	fi
+	emerge -u1KO nvidia-drivers
 }
