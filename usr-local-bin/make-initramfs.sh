@@ -1,6 +1,15 @@
 #!/bin/busybox sh
 
-[ -e ~/.config/make-initramfs.conf ] && source ~/.config/make-initramfs.conf
+if [ -z "$HOME" ]
+then
+	HOME="$(getent passwd $(whoami) | cut -d: -f6)"
+fi
+
+if [ -e "$HOME/.config/make-initramfs.conf" ]
+then
+	echo "Using $HOME/.config/make-initramfs.conf"
+	source "$HOME/.config/make-initramfs.conf"
+fi
 
 : ${INITRAMFS_DIR:=/usr/src/initramfs}
 : ${INCLUDE_COMMANDS:=busybox cryptsetup}
@@ -27,12 +36,8 @@ function errorshell() {
 	fi
 }
 
-[ "$(whoami)" == "root" ] || errorshell "Only root can do this (due to mknod). Try ${NORMAL}${BOLD}sudo $(basename $0) $@"
-
 OUTFILE="$1"
 shift
-
-[ -n "$OUTFILE" ] || errorshell "No output file specified"
 
 [ -n "$INITRAMFS_DIR" ] || errorshell "\$INITRAMFS_DIR cannot be empty!"
 
@@ -44,9 +49,13 @@ done
 INCLUDE_LIBS="$(ldd $INCLUDE_PATHS | sed -En 's!.*\s(/[^ ]+) \(.*!\1!p' | sort | uniq)"
 
 # libgcc_s doesn't show up in ldd but cryptsetup needs it anyway
-INCLUDE_LIBS="${INCLUDE_LIBS} $(LD_DEBUG=libs python3 -c "import ctypes; ctypes.CDLL('libgcc_s.so.1')" 2>&1 | egrep "trying file=.*libgcc_s.so.1$" | cut -d= -f2)"
+INCLUDE_LIBS="${INCLUDE_LIBS} $(LD_DEBUG=libs python3 -c "import ctypes; ctypes.CDLL('libgcc_s.so.1')" 2>&1 | egrep "trying file=.*libgcc_s.so.1$" | tail -n1 | cut -d= -f2)"
 
 echo "Initramfs projected size: $(du -cshH $INCLUDE_PATHS $INCLUDE_LIBS $INCLUDE_EXTRA | tail -n1)"
+
+[ "$(whoami)" == "root" ] || errorshell "Only root can do this (due to mknod). Try ${NORMAL}${BOLD}sudo $(basename $0) $@"
+
+[ -n "$OUTFILE" ] || errorshell "No output file specified"
 
 ############################################
 #
@@ -85,6 +94,16 @@ do
 	EXPECTED_FILES="$EXPECTED_FILES $(basename "$E")"
 done
 
+# echo "Expected files: $EXPECTED_FILES"
+
+EXPECTED_FILES_REGEX="./""$(echo "$EXPECTED_FILES" | sed -e 's! !|./!g')"'|workaround-busybox-grep-bug'
+UNEXPECTED_FILES="$(cd $INITRAMFS_DIR; find . -type f | grep -E -v \'$EXPECTED_FILES_REGEX\')"
+
+if [ -n "$UNEXPECTED_FILES" ]
+then
+    echo "${BOLD}Unexpected Files found: ${RED}$UNEXPECTED_FILES${NORMAL}"
+fi
+
 ###########################################
 #
 # Generate init script
@@ -120,12 +139,15 @@ function errorshell() {
 }
 
 mount -t proc     -o nodev,nosuid,noexec none /proc    || errorshell "Failed to mount /proc"
+[ -e /etc/mtab ] || ln -s /proc/mounts /etc/mtab
 mount -t sysfs    -o nodev,nosuid,noexec none /sys     || errorshell "Failed to mount /sys"
 mount -t devtmpfs -o nosuid,noexec       none /dev     || errorshell "Failed to mount /dev"
 mkdir -p /dev/pts /dev/shm
 mount -t devpts   -o nosuid,noexec       none /dev/pts || errorshell "Failed to mount /dev/pts"
 mount -t tmpfs    -o nodev,nosuid,noexec none /dev/shm || errorshell "Failed to mount /dev/shm"
 
+[ -e /bin/mdev ] || ln -s /bin/busybox /bin/mdev
+echo /bin/mdev > /proc/sys/kernel/hotplug
 mdev -s || errorshell "mdev -s Failed to populate /dev"
 
 function getvar() {
@@ -136,31 +158,35 @@ if [ -n "$(getvar luks)" ]
 then
     LUKS="$(getvar luks)"
 fi
+
+if [ -n "$(getvar root)" ]
+then
+    ROOT="$(getvar root)"
+fi
+
 if [ -n "$LUKS" ]
 then
-	echo "LUKS on $LUKS"
+    echo "LUKS on $LUKS"
+
+    if [ -n "$(getvar luksheader)" ]
+    then
+        LUKSHEADER="$(getvar luksheader)"
+    fi
+
+    ( sleep 2; echo "${BOLD}Enter password: ${NORMAL}"; ) &
+    while ! cryptsetup open "$LUKS" ${LUKSHEADER:+--header $LUKSHEADER} root
+    do
+        kill %%
+        echo "${BOLD}Error: ${RED}cryptsetup failed!$NORMAL"
+        echo
+        sleep 3
+        echo -n "Try again? [Y/n] "
+        read
+        [[ "$REPLY" =~ '^[nN]' ]] && errorshell "cryptsetup failed, user bailed!"
+    done
+    kill %%
+    ROOT=/dev/mapper/root
 fi
-
-if [ -n "$(getvar luksheader)" ]
-then
-    LUKSHEADER="$(getvar luksheader)"
-fi
-
-# if [ -n "$(getvar root)" ]
-# then
-#     ROOT="$(getvar root)"
-# fi
-
-while ! cryptsetup open "$LUKS" ${LUKSHEADER:+--header $LUKSHEADER} root
-do
-    echo "${BOLD}Error: ${RED}cryptsetup failed!$NORMAL"
-    echo
-    sleep 3
-    echo -n "Try again? [Y/n] "
-    read
-    [[ "$REPLY" =~ '^[nN]' ]] && errorshell "cryptsetup failed, user bailed!"
-done
-ROOT=/dev/mapper/root
 
 if [ -n "$(getvar rootfstype)" ]
 then
