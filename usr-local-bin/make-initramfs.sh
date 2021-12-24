@@ -1,9 +1,12 @@
 #!/bin/busybox sh
 
-if [ -z "$HOME" ]
-then
-	HOME="$(getent passwd $(whoami) | cut -d: -f6)"
-fi
+#if [ -z "$HOME" ]
+#then
+HOME="$(getent passwd $(whoami) | cut -d: -f6)"
+#fi
+
+echo "USER=$(whoami)"
+echo "HOME=$HOME"
 
 if [ -e "$HOME/.config/make-initramfs.conf" ]
 then
