@@ -79,6 +79,12 @@ else
 	exit 1
 fi
 
+if [ -f /boot/EFI/initramfs.gz ]
+then
+    echo "Updating initramfs…"
+    make-initramfs.sh /boot/EFI/initramfs.gz || exit 1
+fi
+
 echo -n "*** Setting linux.efi as next boot... "
 efibootmgr -n $(efibootmgr -v | grep linux.efi | cut -b5-8)
 echo "OK"
