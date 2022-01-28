@@ -45,7 +45,7 @@ args = parser.parse_args()
 
 vin  = args.Vin
 vout = args.Vout
-es   = eseries[args.series]
+es   = eseries[args.series] + [eseries[args.series][0] * 10]
 rat  = vout / vin
 
 if (vout > vin):
