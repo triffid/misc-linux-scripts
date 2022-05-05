@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# change to perl -pi~ -e when it works good
+
+perl -pe '
+BEGIN { $a = 0; $b = 0; $fillclearances = 0; }
+m{^<class number="(\d+)"} && do {
+  $b = 0;
+  while ($a < $1) {
+    print "<class number=\"$a\" name=\"eagle-is-stupid-$a\" width=\"0\" drill=\"0\">\t<!-- added -->\n";
+    $fillclearances && print "<clearance class=\"$_\" value=\"0\" />\n" for (0..$a);
+    print "</class>\n";
+    $a++;
+  };
+  $a++;
+};
+
+$fillclearances && m{^<clearance class="(\d+)"} && do {
+  print "<clearance class=\"".($b++)."\" value=\"0\" />\t<!-- added -->\n" while ($b < $1);
+  $b++;
+};
+
+$fillclearances && m{^</class>} && do {
+  print "<clearance class=\"".($b++)."\" value=\"0\" />\t<!-- added -->\n" while ($b < $a);
+  $b++;
+};
+' "$1"
