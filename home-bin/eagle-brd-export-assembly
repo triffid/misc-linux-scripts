@@ -17,7 +17,8 @@ r = e.getroot()
 
 footprints = {}
 
-output_format = "%-12s %-16s %-21s %-21s %-16s %-21s %s"
+#output_format = '"%-12s","%-16s","%-21s","%-21s","%-16s","%-21s","%s"'
+output_format = '"%s","%s","%s","%s","%s","%s","%s","%s"'
 
 for l in r.findall('./drawing/board/libraries/'):
 	#print("Lib '%s'" % l.get('name'))
@@ -28,7 +29,7 @@ for l in r.findall('./drawing/board/libraries/'):
 			#print("\t\tPin '%s': %s,%s" % (s.get('name'), s.get('x'), s.get('y')))
 			path = "%s/%s/%s: %s,%s"%(l.get('name'), p.get('name'), s.get('name'), s.get('x'), s.get('y'))
 			#print(path)
-			if (s.get('name') in ('1', 'A', 'P1', '_1', 'S1', '1A', '+', 'G')):
+			if (s.get('name') in ('1', 'A', 'P1', '_1', 'S1', '1A', 'A1', '+', 'G')):
 				footprints["%s/%s"%(l.get('name'), p.get('name'))] = (float(s.get('x')), float(s.get('y')))
 		for s in p.findall('./pad'):
 			#print("\t\tPin '%s': %s,%s" % (s.get('name'), s.get('x'), s.get('y')))
@@ -37,15 +38,17 @@ for l in r.findall('./drawing/board/libraries/'):
 			if (s.get('name') in ('1', 'A', 'P1', '_1')):
 				footprints["%s/%s"%(l.get('name'), p.get('name'))] = (float(s.get('x')), float(s.get('y')))
 
-print(output_format % ('Part', 'Value', 'Package', 'Position (x y)', 'Orientation', 'Pin 1 (x y)', 'Errata'))
-print()
+print(output_format % ('RefDes', 'Value', 'Package', 'POS_X","POS_Y', 'Rotation', 'Mirror', 'PIN1_X","PIN1_Y', 'Errata'))
+#print()
 
 rr = re.compile('(M?)R(\d+)')
 
 for e in r.findall('./drawing/board/elements/'):
-	if (e.attrib['library'] not in ('testpad','testpoint') and e.get('package') not in ('2PT_GND_TIE',)):
-		pin1 = ""
+	if (e.attrib['library'] not in ('testpad','testpoint','TC2030') and e.get('package') not in ('2PT_GND_TIE',)):
+		pin1 = '","'
 		foot = "%s/%s" % (e.get('library'), e.get('package'))
+		rangle = 0
+		mirr = 'NO'
 		if (foot in footprints):
 			pin1off = footprints[foot]
 			m = rr.match(e.get('rot', 'R0'))
@@ -57,10 +60,11 @@ for e in r.findall('./drawing/board/elements/'):
 				pin1[1] = pin1off[1] * math.cos(rangle * math.pi / 180) + pin1off[0] * math.sin(rangle * math.pi / 180)
 			if ('M' in g[0]):
 				pin1[0] = -pin1[0]
-			pin1 = "(%2.5g %2.5g)" % (pin1[0] + float(e.attrib['x']), pin1[1] + float(e.attrib['y']))
-		posxy = "(%2.5g %2.5g)" % (float(e.attrib['x']), float(e.attrib['y']))
+				mirr = 'YES'
+			pin1 = '%2.5g","%2.5g' % (pin1[0] + float(e.attrib['x']), pin1[1] + float(e.attrib['y']))
+		posxy = '%2.5g","%2.5g' % (float(e.attrib['x']), float(e.attrib['y']))
 		extra = ""
 		for a in sorted(e.findall('./'), key=lambda n: str.lower(n.attrib['name'])):
 			if ('value' in a.attrib):
 				extra += "%s:%s\t" % (a.attrib['name'], a.attrib['value'])
-		print(output_format % (e.attrib['name'], e.attrib['value'], e.attrib['package'], posxy, e.attrib.get('rot', 'R0'), pin1, extra))
+		print(output_format % (e.attrib['name'], e.attrib['value'], e.attrib['package'], posxy, round(rangle), mirr, pin1, extra))
