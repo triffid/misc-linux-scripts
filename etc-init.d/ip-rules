@@ -29,7 +29,7 @@ restore() {
 save() {
 	ebegin "Saving ip rules to $IP_RULES_SAVE"
 	mkdir -p "$(dirname "${IP_RULES_SAVE}")"
-	ip rule show | egrep -v '^(0|32767|32766):' | sed -e 's/^\(.*\):\s*/priority \1 /' > "${IP_RULES_SAVE}"
+	ip rule show | egrep -v '^(0|32767|32766|1[01].):' | sed -e 's/^\(.*\):\s*/priority \1 /' > "${IP_RULES_SAVE}"
 	chmod 0600 "${IP_RULES_SAVE}"
 	eend $?
 }
