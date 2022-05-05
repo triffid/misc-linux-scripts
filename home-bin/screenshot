@@ -1,11 +1,13 @@
 #!/bin/bash
 
-DATETIME=$(date +%Y%m%d-%H%M%S)
-DATE=$(echo $DATETIME | cut -d- -f1)
+NOW="$(date -Ins)"
 
-mkdir -p ~/Screenshots/$DATE && ln -nfs ~/Screenshots/$DATE ~/Screenshots/latest
+DATETIME="$(date -d"${NOW}" +%Y%m%d-%H%M%S)"
+DIR="$HOME/Screenshots/$(date -d"${NOW}" +%Y/%Y%m)"
 
-FILE="$HOME/Screenshots/$DATE/screenshot-$DATETIME.png"
+mkdir -p "$DIR" && ln -nfs "$DIR" ~/Screenshots/latest
+
+FILE="$DIR/screenshot-$DATETIME.png"
 TRIES=0
 while [ $TRIES -le 10 ] && ! [ -e "$FILE" ]
 do
