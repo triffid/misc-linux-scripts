@@ -1,0 +1,116 @@
+#!/bin/sh
+
+MODDIR="$(realpath "$(pwd)")"
+GAMEDIR="$(readlink "$MODDIR/gamedir")"
+
+modlist() {
+  find "$GAMEDIR" -type l -exec readlink {} + | sed -e 's!^'"$MODDIR"'/!!' | cut -d/ -f1 | sort | uniq
+}
+
+errormessage() {
+  EXIT=0
+  if [ -n "$1" ]
+  then
+    echo
+    echo -e "\t$@"
+    EXIT=1
+  fi
+  echo
+  echo "mod-install - unpacks and symlinks mod archives from current working directory into ./gamedir/ (which should be a symlink)"
+  echo
+  echo "Usage: ${0##*/} [ -r <modname fragment> ] [ modpackage.{zip|7z|rar} ]"
+  echo
+  echo "  -r: remove mod"
+  echo "      Uses text match against the install list so name doesn't need to be complete or exact."
+  echo "      Will throw an error if more than one installed mod matches however"
+  echo
+  echo "  Updates can be performed with: ${0##*/} -r <modname fragment> <newversion.zip>"
+  echo
+  echo "Installed mods:"
+  echo
+  modlist | (
+    while read
+    do
+      echo "    [ $(date -d "$(stat -c %y "$REPLY")" +%Y-%m-%d) ] $REPLY"
+    done
+  ) | sort;
+  echo
+  exit $EXIT
+}
+
+[ -n "$GAMEDIR" ] || errormessage "Can't find GAMEDIR - please symlink it to $MODDIR/gamedir!"
+
+[ -n "$1" ] || errormessage
+
+if [ "$1" == "-r" ]
+then
+  while [ "$1" == "-r" ]
+  do
+    shift;
+    [ -z "$1" ] && errormessage "Please specify mod to remove"
+    REMOVEMOD="$1"
+    shift;
+    
+    if [ "$(modlist | grep -i "$REMOVEMOD" | wc -l)" -ne 1 ]
+    then
+      echo "Multiple or no matching mods found for search term \"$REMOVEMOD\":"
+      modlist | grep -i --color "$REMOVEMOD"
+      errormessage "Please enter a search term that matches only a single mod"
+    fi
+    
+    MODNAME="$(modlist | grep -i "$REMOVEMOD")"
+
+    echo "Removing $MODNAME..."
+    
+    find "$GAMEDIR" -type l | (
+      while read
+      do
+        if readlink "$REPLY" | grep -q "$REMOVEMOD"
+        then
+          rm -v "$REPLY" || exit 1
+        fi
+      done
+    );
+    
+    echo "Removing $MODNAME/"
+    rm -r "$MODNAME/"
+  done
+  [ -n "$1" ] || exit 0
+fi
+
+[ -r "$1" ] || errormessage "$1 not found"
+
+while [ -n "$1" ]
+do
+  ZIP="$1"
+  DIR="${ZIP%.*}"
+  EXT="${ZIP##*.}"
+
+  [ -e "$DIR" ] && rm -r "$DIR"
+
+  echo "Unpacking $ZIP to $DIR"
+
+  case "$EXT" in
+    "zip")
+      unzip -d "$DIR" "$ZIP" || errormessage "unzip failed!"
+      ;;
+    "7z" | "rar")
+      7z x -o"$DIR" "$ZIP" || errormessage "7z failed!"
+      ;;
+    *)
+      errormessage "Unrecognized extension $EXT on $ZIP, don't know how to unpack this!"
+      ;;
+  esac
+
+  pushd "$DIR" &>/dev/null || errormessage "pushd failed!"
+
+  for D in *; do cp -viRs "$(realpath "$D")" "$GAMEDIR" || errormessage "symlinking failed!"; done
+
+  popd &>/dev/null
+
+  echo
+  echo "$ZIP successfully installed!"
+  echo
+
+  shift
+done
