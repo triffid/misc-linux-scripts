@@ -93,6 +93,7 @@ function getonce() {
 		${COOKIEJAR:+-b "$COOKIEJAR"} \
 		-o "$CHUNKFN" \
 		--range $(($N * $CHUNKSIZE))-$((($N * $CHUNKSIZE) + $THISCHUNKSIZE - 1)) \
+		-Y 10000 -y 10 \
 		"$@" \
 		"$URL"
 }
@@ -130,6 +131,7 @@ function get() {
 
 FNAME=${FNAME:-${URL##*/}}
 FNAME=${FNAME:-index.html}
+FNAME=${FNAME%%\?*}
 
 if [ -z "$ALLOK" ]
 then
