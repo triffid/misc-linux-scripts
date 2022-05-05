@@ -6,6 +6,6 @@
 
 while [[ -n "$1" ]]; do
 	egrep -h "\b$1\b" /var/db/repos/*/profiles/use.*
-	find /var/db/repos -name metadata.xml -exec grep "name=\"$1\"" {} + | sed -En 's!/var/db/repos/([^/]+)/([^/]+/[^/]+)/metadata.xml:.*name="([^"]+)"[^>]*>([^<]+)<.*!\2::\1\n\t\3: \4!p'
+    find /var/db/repos -name metadata.xml -exec grep "name=\"$1\"" {} + | sed -En 's!/var/db/repos/([^/]+)/([^/]+/[^/]+)/metadata.xml:.*<flag[^>]+name="([^"]+)"[^>]*>(.+)</flag>.*!\2::\1\n\t\3: \4!p' | sed -E 's!<[^>]+>!!g'
 	shift
 done
