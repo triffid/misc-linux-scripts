@@ -10,6 +10,16 @@ function inherit {
 	done
 }
 
+debug-print-function() {
+:
+}
+die() {
+:
+}
+ver_cut() {
+echo 1
+}
+
 cd /var/db/repos
 
 {
@@ -19,9 +29,11 @@ cd /var/db/repos
 		for F in *-*/*/; do
 			echo -en "${F%/}::$R\t";
 			(
-				source $F*ebuild &>/dev/null
-				perl -e 's/[\s\r\n]+/ /s for @ARGV; printf "%s\t(%s)\n", @ARGV' "$DESCRIPTION" "$HOMEPAGE"
-			) || echo "failed to parse ebuild"
+                echo $F*ebuild >/dev/stderr
+				source $F*ebuild >/dev/stderr
+# 				perl -e 's/[\s\r\n]+/ /s for @ARGV; printf "%s\t(%s)\n", @ARGV' "$DESCRIPTION" "$HOMEPAGE"
+                echo $DESCRIPTION '('$HOMEPAGE')'
+			) || exit echo "failed to parse ebuild"
 		done
 		popd
 	done

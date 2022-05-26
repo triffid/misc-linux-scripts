@@ -13,7 +13,7 @@ then
 		then
 			U=$( \
 				realpath "$U" \
-				| sed -e 's!^/mnt/storage!http://'"192.168.1.242"'!' \
+				| sed -e 's!^/mnt/storage!http://'"192.168.1.237"'!' \
 				| perl -pe 's/([\[\]\(\) ])/sprintf "%%%02X", ord($1)/ge' \
 			)
 		fi

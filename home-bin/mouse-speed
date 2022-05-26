@@ -17,11 +17,11 @@ do
 # 	xinput set-prop $N 'Coordinate Transformation Matrix' "$ACCEL", 0, 0, 0, "$ACCEL", 0, 0, 0, 1
 	xinput set-prop $N "Device Accel Profile" 2
 	xinput set-prop $N "Device Accel Constant Deceleration" 1
-	xinput set-prop $N "Device Accel Adaptive Deceleration" 32
-	xinput set-prop $N "Device Accel Velocity Scaling" 0.5
+	xinput set-prop $N "Device Accel Adaptive Deceleration" 3
+	xinput set-prop $N "Device Accel Velocity Scaling" 1.5
 done
 
-for I in $(solaar show | egrep '^  [0-9]+: ' | cut -d: -f1)
-do
-	solaar config $I pointer_speed 511
-done
+# for I in $(solaar show | egrep '^  [0-9]+: ' | cut -d: -f1)
+# do
+# 	solaar config $I pointer_speed 511
+# done

@@ -2,7 +2,32 @@
 
 if [ -n "$1" ]
 then
-	curl --header 'Content-Type: application/json' --data-binary '{ "id": 1, "jsonrpc": "2.0", "method": "Player.SetSubtitle", "params": {"playerid": 1, "subtitle": "'"$1"'" } }' jeanelle.local:8080/jsonrpc; echo
+	LIST=""
+	while [ -n "$1" ]
+	do
+		U="$1"
+		if [ -r "$U" ]
+		then
+			U=$( \
+				realpath "$U" \
+				| sed -e 's!^/mnt/storage!http://'"192.168.1.242"'!' \
+				| perl -pe 's/([\[\]\(\) ])/sprintf "%%%02X", ord($1)/ge' \
+			)
+		fi
+		if [[ "$U" =~ ^/mnt/storage ]] || [[ "$U" =~ ^https?:// ]]
+		then
+			if [ -n "$LIST" ]
+			then
+				LIST="$LIST, "
+			fi
+			LIST="\"subtitle\": \"$U\""
+		else
+			echo "$1 ($U) not in appropriate location, skipping"
+		fi
+		shift
+	done
+	echo curl --header 'Content-Type: application/json' --data-binary '{ "id": 1, "jsonrpc": "2.0", "method": "Player.SetSubtitle", "params": {"id": 1, '"$LIST"' } }' 192.168.1.97:8080/jsonrpc; echo
+	curl --header 'Content-Type: application/json' --data-binary '{ "id": 1, "jsonrpc": "2.0", "method": "Player.SetSubtitle", "params": {"id": 1, '"$LIST"' } }' 192.168.1.97:8080/jsonrpc; echo
 else
 	echo "Usage: kodi-sub <file or URL>"
 	exit 1
