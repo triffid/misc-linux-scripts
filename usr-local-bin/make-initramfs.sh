@@ -31,12 +31,12 @@ function errorshell() {
 		echo
 		echo "${BOLD}Error: $RED$@$NORMAL"
 		echo
-        echo "Usage:"
-        echo
-        echo "  $(basename "$0") [outfile.cpio.gz]"
-        echo
-		exit 1
 	fi
+	echo "Usage:"
+	echo
+	echo "  $(basename "$0") [outfile.cpio.gz]"
+	echo
+	exit 1
 }
 
 OUTFILE="$1"
@@ -154,56 +154,56 @@ echo /bin/mdev > /proc/sys/kernel/hotplug
 mdev -s || errorshell "mdev -s Failed to populate /dev"
 
 function getvar() {
-    sed -En 's/(^|.* )'"$1"'=(\S+)( .*|$)/\2/ip; s/(^|.* )('"$1"')( .*|$)/\2/ip' /proc/cmdline
+	sed -En 's/(^|.* )'"$1"'=(\S+)( .*|$)/\2/ip; s/(^|.* )('"$1"')( .*|$)/\2/ip' /proc/cmdline
 }
 
 if [ -n "$(getvar luks)" ]
 then
-    LUKS="$(getvar luks)"
+	LUKS="$(getvar luks)"
 fi
 
 if [ -n "$(getvar root)" ]
 then
-    ROOT="$(getvar root)"
+	ROOT="$(getvar root)"
 fi
 
 if [ -n "$LUKS" ]
 then
-    echo "LUKS on $LUKS"
+	echo "LUKS on $LUKS"
 
-    if [ -n "$(getvar luksheader)" ]
-    then
-        LUKSHEADER="$(getvar luksheader)"
-    fi
+	if [ -n "$(getvar luksheader)" ]
+	then
+		LUKSHEADER="$(getvar luksheader)"
+	fi
 
-    ( sleep 2; echo "${BOLD}Enter password: ${NORMAL}"; ) &
-    while ! cryptsetup open "$LUKS" ${LUKSHEADER:+--header $LUKSHEADER} root
-    do
-        kill %%
-        echo "${BOLD}Error: ${RED}cryptsetup failed!$NORMAL"
-        echo
-        sleep 3
-        echo -n "Try again? [Y/n] "
-        read
-        [[ "$REPLY" =~ '^[nN]' ]] && errorshell "cryptsetup failed, user bailed!"
-    done
-    kill %%
-    ROOT=/dev/mapper/root
+	( sleep 2; echo "${BOLD}Enter password: ${NORMAL}"; ) &
+	while ! cryptsetup open "$LUKS" ${LUKSHEADER:+--header $LUKSHEADER} root
+	do
+		kill %%
+		echo "${BOLD}Error: ${RED}cryptsetup failed!$NORMAL"
+		echo
+		sleep 3
+		echo -n "Try again? [Y/n] "
+		read
+		[[ "$REPLY" =~ '^[nN]' ]] && errorshell "cryptsetup failed, user bailed!"
+	done
+	kill %%
+	ROOT=/dev/mapper/root
 fi
 
 if [ -n "$(getvar rootfstype)" ]
 then
-    ROOTFSTYPE="$(getvar rootfstype)"
+	ROOTFSTYPE="$(getvar rootfstype)"
 fi
 
 if [ -n "$(getvar rootopts)" ]
 then
-    ROOTOPTS="$(getvar rootopts)"
+	ROOTOPTS="$(getvar rootopts)"
 fi
 
 if [ -z "$(getvar rw)" ]
 then
-    ROOTOPTS="ro${ROOTOPTS:+,$ROOTOPTS}"
+	ROOTOPTS="ro${ROOTOPTS:+,$ROOTOPTS}"
 fi
 
 mount ${ROOTOPTS:+-o $ROOTOPTS} ${ROOTFSTYPE:+-t $ROOTFSTYPE} "$ROOT" /mnt || errorshell "Failed to mount $ROOT ${ROOTFSTYPE:+($ROOTFSTYPE) }on /mnt"
