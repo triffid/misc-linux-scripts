@@ -1,3 +1,161 @@
+#!/usr/bin/perl
+
 #!/bin/bash
 
-perl -pi~ -e 's/name="([^"]+)"\s+urn="urn:adsk.eagle:library:(\d+)"/name="$1-$2"/; s/library="([^"]+)"\s+library_urn="urn:adsk.eagle:library:(\d+)"/library="$1-$2"/;' "$@"
+# perl -pi~ -e 's/name="([^"]+)"\s+urn="urn:adsk.eagle:library:(\d+)"/name="$1-$2"/; s/library="([^"]+)"\s+library_urn="urn:adsk.eagle:library:(\d+)"/library="$1-$2"/;' "$@"
+
+
+# eagle-fix-v9-dup-libs
+#
+# Copyright (C) 2017-2022 Michael Moon
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+use strict;
+use utf8;
+
+use XML::LibXML;
+use Data::Dumper;
+
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
+binmode STDOUT, "encoding(UTF-8)";
+
+if (@ARGV < 1) {
+	print "Usage: eagle-fix-v9-dup-libs [-p] <file.sch>\n";
+	exit 0;
+}
+
+my $fileprefix = $ARGV[0];
+$fileprefix =~ s/\.(sch|brd)$//;
+
+my $sch = XML::LibXML->load_xml(location => $fileprefix.".sch", { encoding => "UTF8" });
+my $brd = XML::LibXML->load_xml(location => $fileprefix.".brd", { encoding => "utf8" });
+
+{
+	my %libraries;
+
+	for my $library ($sch->findnodes('/eagle/drawing/schematic/libraries/library')) {
+		if ($libraries{$library->{name}}) {
+			my $orig = $libraries{$library->{name}};
+			print stderr "Library $library->{name} already exists, merging…\n";
+			
+			{
+				my $oldpackages = $orig->findnodes("packages")->[0];
+				
+				my $f = $oldpackages->getChildrenByLocalName("*");
+	# 			print "Old library has:\n";
+	# 			print "\t$_->{name}\n" for (@{$f});
+				
+	# 			die $oldpackages->exists("package[\@name=\"C0402\"]");
+				
+				my $x = $library->getChildrenByLocalName("packages")->[0]->getChildrenByLocalName("*");
+	# 			print "New library has:\n";
+				for (@{$x}) {
+					my $e = $oldpackages->exists("package[\@name=\"$_->{name}\"]");
+	# 				printf "\t$_->{name} %s\n", ($e?" *":"");
+					if (!$e) {
+						$oldpackages->appendChild($_);
+						print stderr "\tpackage $_->{name} appended to $orig\n";
+					}
+				}
+	# 			$orig->findnodes("packages")->[0]->parentNode->appendChild($x)->normalize();
+	# 			my $y = $library->getChildrenByLocalName("devicesets")->[0];
+			}
+
+			{
+				my $olddevicesets = $orig->findnodes("devicesets")->[0];
+				
+				my $f = $olddevicesets->getChildrenByLocalName("*");
+				print "Old library has:\n";
+				print "\t'$_->{name}'\n" for (@{$f});
+				
+	# 			die $olddevicesets->exists("deviceset[\@name=\"C0402\"]");
+				
+				my $x = $library->getChildrenByLocalName("devicesets")->[0]->getChildrenByLocalName("*");
+				print "New library has:\n";
+				for (@{$x}) {
+					my $e = $olddevicesets->exists("deviceset[\@name=\"$_->{name}\"]");
+					printf "\t'$_->{name}'%s\n", ($e?" *":"");
+					if (!$e) {
+						$olddevicesets->appendChild($_);
+						print stderr "\tdeviceset $_->{name} appended to $orig->{name}\n";
+					}
+				}
+	# 			$orig->findnodes("devicesets")->[0]->parentNode->appendChild($x)->normalize();
+	# 			my $y = $library->getChildrenByLocalName("devicesets")->[0];
+			}
+
+			$library->unbindNode();
+		}
+		else {
+			print stderr Dumper \%{$library};
+			$libraries{$library->{name}} = $library;
+		}
+	}
+}
+
+{
+	my %libraries;
+
+	for my $library ($brd->findnodes('/eagle/drawing/board/libraries/library')) {
+		if ($libraries{$library->{name}}) {
+			my $orig = $libraries{$library->{name}};
+			print stderr "Library $library->{name} already exists, merging…\n";
+			
+			{
+				my $oldpackages = $orig->findnodes("packages")->[0];
+				
+				my $f = $oldpackages->getChildrenByLocalName("*");
+	# 			print "Old library has:\n";
+	# 			print "\t$_->{name}\n" for (@{$f});
+				
+	# 			die $oldpackages->exists("package[\@name=\"C0402\"]");
+				
+				my $x = $library->getChildrenByLocalName("packages")->[0]->getChildrenByLocalName("*");
+	# 			print "New library has:\n";
+				for (@{$x}) {
+					my $e = $oldpackages->exists("package[\@name=\"$_->{name}\"]");
+	# 				printf "\t$_->{name} %s\n", ($e?" *":"");
+					if (!$e) {
+						$oldpackages->appendChild($_);
+						print stderr "\tpackage $_->{name} appended to $orig->{name}\n";
+					}
+				}
+	# 			$orig->findnodes("packages")->[0]->parentNode->appendChild($x)->normalize();
+	# 			my $y = $library->getChildrenByLocalName("devicesets")->[0];
+			}
+
+			$library->unbindNode();
+		}
+		else {
+			print stderr Dumper \%{$library};
+			$libraries{$library->{name}} = $library;
+		}
+	}
+}
+
+{
+	open my $fh, '>', $fileprefix."1.sch";
+	binmode $fh;
+	$sch->toFH($fh);
+	close $fh;
+}
+
+{
+	open my $fh, '>', $fileprefix."1.brd";
+	binmode $fh;
+	$brd->toFH($fh);
+	close $fh;
+}
