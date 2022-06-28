@@ -1,0 +1,3 @@
+#!/bin/bash
+
+python -c 'import portage; print("\n[ebuild   R   ~] ".join(list(map(lambda x: x[2], portage.mtimedb.get("resume", {}).get("mergelist")))))'  | genlop -p
