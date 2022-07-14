@@ -18,6 +18,19 @@ do
 	fi
 done
 
+cd ~/Private/DCIM/WeChat
+
+for F in $(adb shell "cd /sdcard/Pictures/WeChat; find . -type f")
+do
+	if ! [ -e "$F" ]
+	then
+		[ -d "$(dirname "$F")" ] || mkdir -p "$(dirname "$F")"
+		pushd "$(dirname "$F")" &>/dev/null
+		adb pull "/sdcard/Pictures/WeChat/$F"
+		popd &>/dev/null
+	fi
+done
+
 exit 1
 
 # adb -s $SERIAL shell 'cd /sdcard/DCIM/Camera; bash fix-pics.sh'
