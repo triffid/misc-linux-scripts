@@ -197,7 +197,7 @@ rm "${NAMEREV}_"*
 eagle-brd-export-bom "${NAMEREV}.brd" 2>/dev/null | head -n1 > "${NAMEREV}-BOM.csv"
 eagle-brd-export-bom "${NAMEREV}.brd" | tail -n+2 | sort -h -k 1.2 -r >> "${NAMEREV}-BOM.csv"
 
-unoconv -i FilterOptions=44,34,76 -o "${NAMEREV}-BOM.xlsx" "${NAMEREV}-BOM.csv" || libreoffice --convert-to xlsx "${NAMEREV}-BOM.csv" || true
+unoconv -i FilterOptions=44,34,76,1 -o "${NAMEREV}-BOM.xlsx" "${NAMEREV}-BOM.csv" || libreoffice --infilter="csv:44,34,76,1" --convert-to xlsx "${NAMEREV}-BOM.csv" || true
 
 ### Assembly
 
