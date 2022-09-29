@@ -41,7 +41,7 @@ my $fileprefix = $ARGV[0];
 $fileprefix =~ s/\.(sch|brd)$//;
 
 my $sch = XML::LibXML->load_xml(location => $fileprefix.".sch", { encoding => "UTF8" });
-my $brd = XML::LibXML->load_xml(location => $fileprefix.".brd", { encoding => "utf8" });
+my $brd = XML::LibXML->load_xml(location => $fileprefix.".brd", { encoding => "UTF8" });
 
 {
 	my %libraries;
@@ -50,7 +50,30 @@ my $brd = XML::LibXML->load_xml(location => $fileprefix.".brd", { encoding => "u
 		if ($libraries{$library->{name}}) {
 			my $orig = $libraries{$library->{name}};
 			print stderr "Library $library->{name} already exists, merging…\n";
-			
+
+			{
+				my $oldsymbols = $orig->findnodes("symbols")->[0];
+				
+				my $f = $oldsymbols->getChildrenByLocalName("*");
+	# 			print "Old library has:\n";
+	# 			print "\t$_->{name}\n" for (@{$f});
+				
+	# 			die $oldsymbols->exists("symbol[\@name=\"C0402\"]");
+				
+				my $x = $library->getChildrenByLocalName("symbols")->[0]->getChildrenByLocalName("*");
+	# 			print "New library has:\n";
+				for (@{$x}) {
+					my $e = $oldsymbols->exists("symbol[\@name=\"$_->{name}\"]");
+	# 				printf "\t$_->{name} %s\n", ($e?" *":"");
+					if (!$e) {
+						$oldsymbols->appendChild($_);
+						print stderr "\tsymbol $_->{name} appended to $orig\n";
+					}
+				}
+	# 			$orig->findnodes("symbols")->[0]->parentNode->appendChild($x)->normalize();
+	# 			my $y = $library->getChildrenByLocalName("devicesets")->[0];
+			}
+
 			{
 				my $oldpackages = $orig->findnodes("packages")->[0];
 				
