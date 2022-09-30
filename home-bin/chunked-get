@@ -12,7 +12,7 @@ GREEN=$'\e[32m'
 RESETCOLOUR=$'\e[0m'
 
 function usage {
-	echo "Usage: ${0##*/} [-c chunksize] [-j concurrent downloads] [-o outfile] [-u username] [-C cookiejar] [-d delay] [--sha1sum checksum] [--sha256sum checksum] [--md5sum checksum] url [curl options]"
+	echo "Usage: ${0##*/} [-c chunksize] [-j concurrent downloads] [-o outfile] [-u username] [-C cookiejar] [-d delay] [--sha1sum checksum] [--sha256sum checksum] [--md5sum checksum] url [[options] url] …"
 }
 
 if [ -z "$1" ]
@@ -24,59 +24,6 @@ fi
 trap 'kill 0' SIGINT
 trap 'kill 0' SIGTERM
 trap 'kill 0' SIGKILL
-
-while [ -n "$1" ] && [ -z "$URL" ]
-do
-	case "$1" in
-		"-u")
-			shift
-			USER="$1"
-			;;
-		"-c")
-			shift
-			CHUNKSIZE=$(($1 + 0))
-			;;
-		"-o")
-			shift
-			FNAME="$1"
-			;;
-		"-j")
-			shift
-			JOBS=$(($1 + 0))
-			;;
-		"-d")
-			shift
-			DELAY="$1"
-			;;
-		"--sha1sum")
-			shift
-			SHA1SUM="$1"
-			;;
-		"--sha256sum")
-			shift
-			SHA256SUM="$1"
-			;;
-		"--md5sum")
-			shift
-			MD5SUM="$1"
-			;;
-		"-C")
-			shift
-			COOKIEJAR="$1"
-			;;
-		*)
-			if [ -z "$URL" ]
-			then
-				URL="$1"
-			else
-				echo "Unknown option: $1"
-				usage
-				exit 1
-			fi
-			;;
-	esac
-	shift
-done
 
 function cursize () {
 	if [ -e "$1" ]
@@ -94,7 +41,6 @@ function getonce() {
 		-o "$CHUNKFN" \
 		--range $(($N * $CHUNKSIZE))-$((($N * $CHUNKSIZE) + $THISCHUNKSIZE - 1)) \
 		-Y 10000 -y 10 \
-		"$@" \
 		"$URL"
 }
 
@@ -116,7 +62,7 @@ function get() {
 		do
 			if [ -e "$CHUNKFN" ]
 			then
-				echo "Re-downloading chunk $CHUNKFN (because curl can't handle -C and -r together)"
+				echo "Re-downloading chunk $CHUNKFN [$I of $COUNT] (because curl can't handle -C and -r together)"
 				rm "$CHUNKFN"
 			fi
 
@@ -125,150 +71,213 @@ function get() {
 			getonce
 		done
 
-		echo "$CHUNKFN complete"
+		echo "$CHUNKFN [$I of $COUNT] complete"
 	) &
 }
 
-FNAME=${FNAME:-${URL##*/}}
-FNAME=${FNAME:-index.html}
-FNAME=${FNAME%%\?*}
+while [ -n "$1" ]
+do
+	unset FNAME
+	unset ALLOK
 
-if [ -z "$ALLOK" ]
-then
-	echo "Downloading $FNAME from $URL"
-
-	if [ -n "$USER" ]
-	then
-		echo -n "User $USER Password: "
-		read -s PASS
-	fi
-
-	# SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$@" "$URL" | tee /dev/stderr | perl -ne 'BEGIN { $s = 0; } /Content-Length:\s*(\d+)/i && do { $s = $1 if $1 > $s }; /Content-Range:\s*bytes\s+(\d+)-(\d+)\/(\d+)/i && do { $s = $3 if $3 > $s; }; END { print "$s\n"; }')
-	SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$@" "$URL" | tee /dev/stderr | grep -i "^Content-Range:" | cut -d/ -f2 | tr -d $'\r')
-
-	echo "Size is '$SIZE'"
-
-	if [ -z "$SIZE" ] || [ "$SIZE" -le 65536 ]
-	then
-		echo "Could not determine size, redirected?"
-		exit 1
-	fi
-
-	COUNT=$(($SIZE / $CHUNKSIZE))
-
-	echo -n "$(($SIZE / $CHUNKSIZE))x$((CHUNKSIZE / 1048576))MB chunks"
-	if [ $(($SIZE - (($SIZE / $CHUNKSIZE) * $CHUNKSIZE))) -eq 0 ]
-	then
-		COUNT=$(($COUNT - 1))
-	else
-		echo -n " and one $(($SIZE - (($SIZE / $CHUNKSIZE) * $CHUNKSIZE)))b chunk"
-	fi
-	echo " for $(($COUNT + 1)) total chunks"
-
-	for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done')
+	while [[ "$1" =~ ^- ]]
 	do
-		N=$((10#$I))
-		CURSIZE=0
-		CHUNKFN=".$FNAME.$I"
-
-		THISCHUNKSIZE=$CHUNKSIZE
-		if [ $N -eq $COUNT ]
-		then
-			THISCHUNKSIZE=$(($SIZE - ($CHUNKSIZE * $N)))
-		fi
-		if [ $(cursize "$CHUNKFN") -lt $THISCHUNKSIZE ]
-		then
-			echo "Starting $CHUNKFN"
-			get "$I"
-			sleep $DELAY
-		fi
-
-		while [ $(jobs -p | wc -l) -ge $JOBS ]
-		do
-			wait -n
-		done
+		case "$1" in
+			"-u")
+				shift
+				USER="$1"
+				;;
+			"-c")
+				shift
+				CHUNKSIZE=$(($1 + 0))
+				;;
+			"-o")
+				shift
+				FNAME="$1"
+				;;
+			"-j")
+				shift
+				JOBS=$(($1 + 0))
+				;;
+			"-d")
+				shift
+				DELAY="$1"
+				;;
+			"--sha1sum")
+				shift
+				SHA1SUM="$1"
+				;;
+			"--sha256sum")
+				shift
+				SHA256SUM="$1"
+				;;
+			"--md5sum")
+				shift
+				MD5SUM="$1"
+				;;
+			"-C")
+				shift
+				COOKIEJAR="$1"
+				;;
+			*)
+				echo "Unknown option: $1"
+				usage
+				exit 1
+				;;
+		esac
+		shift
 	done
 
-	wait
+	if [ -z "$1" ]
+	then
+		usage
+		exit 0
+	fi
+	
+	URL="$1"
+	shift
+	
+	FNAME=${FNAME:-${URL##*/}}
+	FNAME=${FNAME:-index.html}
+	FNAME=${FNAME%%\?*}
 
-	echo "All chunks finished"
+	if [ -z "$ALLOK" ]
+	then
+		echo "Downloading $FNAME from $URL"
 
-	ALLOK=1
-
-	PARTS=""
-
-	for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done')
-	do
-		N=$((10#$I))
-		CHUNKFN=".$FNAME.$I"
-		if [ -e "$CHUNKFN" ]
+		if [ -n "$USER" ]
 		then
-			CURSIZE=$(stat -c "%s" "$CHUNKFN")
+			echo -n "User $USER Password: "
+			read -s PASS
+		fi
+
+		# SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$@" "$URL" | tee /dev/stderr | perl -ne 'BEGIN { $s = 0; } /Content-Length:\s*(\d+)/i && do { $s = $1 if $1 > $s }; /Content-Range:\s*bytes\s+(\d+)-(\d+)\/(\d+)/i && do { $s = $3 if $3 > $s; }; END { print "$s\n"; }')
+		SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$URL" | tee /dev/stderr | grep -i "^Content-Range:" | cut -d/ -f2 | tr -d $'\r')
+
+		echo "Size is '$SIZE'"
+
+		if [ -z "$SIZE" ] || [ "$SIZE" -le 65536 ]
+		then
+			echo "Could not determine size, redirected?"
+			exit 1
+		fi
+
+		COUNT=$(($SIZE / $CHUNKSIZE))
+
+		echo -n "$(($SIZE / $CHUNKSIZE))x$((CHUNKSIZE / 1048576))MB chunks"
+		if [ $(($SIZE - (($SIZE / $CHUNKSIZE) * $CHUNKSIZE))) -eq 0 ]
+		then
+			COUNT=$(($COUNT - 1))
+		else
+			echo -n " and one $(($SIZE - (($SIZE / $CHUNKSIZE) * $CHUNKSIZE)))b chunk"
+		fi
+		echo " for $(($COUNT + 1)) total chunks"
+
+		for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done')
+		do
+			N=$((10#$I))
+			CURSIZE=0
+			CHUNKFN=".$FNAME.$I"
+
 			THISCHUNKSIZE=$CHUNKSIZE
 			if [ $N -eq $COUNT ]
 			then
 				THISCHUNKSIZE=$(($SIZE - ($CHUNKSIZE * $N)))
 			fi
-			if [ $CURSIZE -lt $THISCHUNKSIZE ]
+			if [ $(cursize "$CHUNKFN") -lt $THISCHUNKSIZE ]
 			then
-				echo "$CHUNKFN is incomplete! (Got $CURSIZE of $CHUNKSIZE bytes) Run $0 again"
+				echo "Starting $CHUNKFN"
+				get "$I"
+				sleep $DELAY
+			fi
+
+			while [ $(jobs -p | wc -l) -ge $JOBS ]
+			do
+				wait -n
+			done
+		done
+
+		wait
+
+		echo "All chunks finished"
+
+		ALLOK=1
+
+		PARTS=""
+
+		for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done')
+		do
+			N=$((10#$I))
+			CHUNKFN=".$FNAME.$I"
+			if [ -e "$CHUNKFN" ]
+			then
+				CURSIZE=$(stat -c "%s" "$CHUNKFN")
+				THISCHUNKSIZE=$CHUNKSIZE
+				if [ $N -eq $COUNT ]
+				then
+					THISCHUNKSIZE=$(($SIZE - ($CHUNKSIZE * $N)))
+				fi
+				if [ $CURSIZE -lt $THISCHUNKSIZE ]
+				then
+					echo "$CHUNKFN is incomplete! (Got $CURSIZE of $CHUNKSIZE bytes) Run $0 again"
+					ALLOK=0
+				fi
+			else
+				echo "$CHUNKFN is missing! Run $0 again"
 				ALLOK=0
 			fi
-		else
-			echo "$CHUNKFN is missing! Run $0 again"
-			ALLOK=0
-		fi
-	done
-fi
-
-if [ "$ALLOK" -eq 1 ]
-then
-	for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done')
-	do
-		echo $'\e[0G\e[1A\e[2K'"Assembling $FNAME... $I/$COUNT"
-		# dd if=".$FNAME.$I" of="$FNAME" bs=${CHUNKSIZE} count=1 seek=$((10#$I)) &>/dev/null
-		dd if=".$FNAME.$I" of="$FNAME" bs=${CHUNKSIZE} count=1 seek=$((10#$I)) &>/dev/null && rm ".$FNAME.$I"
-	done
-	echo "${GREEN}${FNAME} successfully generated.${RESETCOLOUR}"
-
-	if [ -n "$SHA1SUM" ]
-	then
-		CHECK="$(sha1sum "$FNAME")"
-		if grep -qi "^$SHA1SUM" <<< "$CHECK"
-		then
-			echo "${GREEN}${BOLD}Checksum OK${RESETCOLOUR}"
-		else
-			echo "Sha1sum failed, expected $SHA1SUM got $CHECK"
-			exit 1
-		fi
+		done
 	fi
 
-	if [ -n "$SHA256SUM" ]
+	if [ "$ALLOK" -eq 1 ]
 	then
-		CHECK="$(sha256sum "$FNAME")"
-		if grep -qi "^$SHA256SUM" <<< "$CHECK"
-		then
-			echo "${GREEN}${BOLD}Checksum OK${RESETCOLOUR}"
-		else
-			echo "Sha256sum failed, expected $SHA256SUM got $CHECK"
-			exit 1
-		fi
-	fi
+		for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done')
+		do
+			echo $'\e[0G\e[1A\e[2K'"Assembling $FNAME... $I/$COUNT"
+			# dd if=".$FNAME.$I" of="$FNAME" bs=${CHUNKSIZE} count=1 seek=$((10#$I)) &>/dev/null
+			dd if=".$FNAME.$I" of="$FNAME" bs=${CHUNKSIZE} count=1 seek=$((10#$I)) &>/dev/null && rm ".$FNAME.$I"
+		done
+		echo "${GREEN}${FNAME} successfully generated.${RESETCOLOUR}"
 
-	if [ -n "$MD5SUM" ]
-	then
-		CHECK="$(md5sum "$FNAME")"
-		if grep -qi "^$MD5SUM" <<< "$CHECK"
+		if [ -n "$SHA1SUM" ]
 		then
-			echo "${GREEN}${BOLD}Checksum OK${RESETCOLOUR}"
-		else
-			echo "MD5sum failed, expected $MD5SUM got $CHECK"
-			exit 1
+			CHECK="$(sha1sum "$FNAME")"
+			if grep -qi "^$SHA1SUM" <<< "$CHECK"
+			then
+				echo "${GREEN}${BOLD}Checksum OK${RESETCOLOUR}"
+			else
+				echo "Sha1sum failed, expected $SHA1SUM got $CHECK"
+				exit 1
+			fi
 		fi
-	fi
 
-	# rm $(for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done'); do echo ".$FNAME.$I"; done)
-else
-	rm "$FNAME"
-	exit 1
-fi
+		if [ -n "$SHA256SUM" ]
+		then
+			CHECK="$(sha256sum "$FNAME")"
+			if grep -qi "^$SHA256SUM" <<< "$CHECK"
+			then
+				echo "${GREEN}${BOLD}Checksum OK${RESETCOLOUR}"
+			else
+				echo "Sha256sum failed, expected $SHA256SUM got $CHECK"
+				exit 1
+			fi
+		fi
+
+		if [ -n "$MD5SUM" ]
+		then
+			CHECK="$(md5sum "$FNAME")"
+			if grep -qi "^$MD5SUM" <<< "$CHECK"
+			then
+				echo "${GREEN}${BOLD}Checksum OK${RESETCOLOUR}"
+			else
+				echo "MD5sum failed, expected $MD5SUM got $CHECK"
+				exit 1
+			fi
+		fi
+
+		# rm $(for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done'); do echo ".$FNAME.$I"; done)
+	else
+		rm "$FNAME"
+		exit 1
+	fi
+done
