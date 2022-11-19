@@ -6,8 +6,12 @@ GAMEDIR="$(readlink "$MODDIR/gamedir")"
 echo "MODDIR=\"$MODDIR\""
 echo "GAMEDIR=\"$GAMEDIR\""
 
+LINKSTYLE="s"
+
 modlist() {
-  find "$GAMEDIR/" -type l -exec readlink {} + | egrep "$MODDIR" | sed -e 's!^'"$MODDIR"'/!!' | cut -d/ -f1 | sort | uniq
+  [ -z "$GAMEDIR" ] && exit 1
+#   find "$GAMEDIR/" -type l -exec readlink {} + | egrep "$MODDIR" | sed -e 's!^'"$MODDIR"'/!!' | cut -d/ -f1 | sort | uniq
+  ( find "$MODDIR/" -printf '%D.%i %P\n'; find -L "$GAMEDIR/" -printf '%D.%i\n'; ) | sort -g | uniq -w 11 -D | grep ' ' | cut -d\  -f2- | cut -d/ -f1 | uniq
 }
 
 errormessage() {
@@ -19,13 +23,20 @@ errormessage() {
     EXIT=1
   fi
   echo
+  [ -z "$GAMEDIR" ] && exit 1
   echo "mod-install - unpacks and symlinks mod archives from current working directory into ./gamedir/ (which should be a symlink)"
   echo
-  echo "Usage: ${0##*/} [ -r <modname fragment> ] [ modpackage.{zip|7z|rar} ]"
+  echo "Usage: ${0##*/} [-n] [ -r <modname fragment> ] [-l] [ modpackage.{zip|7z|rar} ]"
   echo
   echo "  -r: remove mod"
   echo "      Uses text match against the install list so name doesn't need to be complete or exact."
   echo "      Will throw an error if more than one installed mod matches however"
+  echo
+  echo "  -n: Don't delete local unpack dir"
+  echo
+  echo "  -u: Unpack only, don't install"
+  echo
+  echo "  -l: hard-link instead of symlink"
   echo
   echo "  Updates can be performed with: ${0##*/} -r <modname fragment> <newversion.zip>"
   echo
@@ -34,52 +45,100 @@ errormessage() {
   modlist | (
     while read
     do
-      echo "    [ $(date -d "$(stat -c %y "$REPLY")" +%Y-%m-%d) ] $REPLY"
+      echo "    [ $(date -d "$(stat -c %y "$MODDIR/$REPLY")" +%Y-%m-%d) ] $REPLY"
     done
   ) | sort;
   echo
   exit $EXIT
 }
 
-[ -n "$GAMEDIR" ] || errormessage "Can't find GAMEDIR - please symlink it to $MODDIR/gamedir!"
+[ -n "$GAMEDIR" ] || errormessage "Can't find ./gamedir - please symlink it to $MODDIR/gamedir!"
+
+[ -f "$GAMEDIR/mod-install-hooks" ] && source "$GAMEDIR/mod-install-hooks"
 
 [ -n "$1" ] || errormessage
 
-if [ "$1" == "-r" ]
-then
-  while [ "$1" == "-r" ]
-  do
-    shift;
-    [ -z "$1" ] && errormessage "Please specify mod to remove"
-    REMOVEMOD="$1"
-    shift;
-    
-    if [ "$(modlist | grep -i "$REMOVEMOD" | wc -l)" -ne 1 ]
-    then
-      echo "Multiple or no matching mods found for search term \"$REMOVEMOD\":"
-      modlist | grep -i --color "$REMOVEMOD"
-      errormessage "Please enter a search term that matches only a single mod"
-    fi
-    
-    MODNAME="$(modlist | grep -i "$REMOVEMOD")"
-
-    echo "Removing $MODNAME..."
-    
-    find "$GAMEDIR/" -type l | (
-      while read
-      do
-        if readlink "$REPLY" | grep -q "$REMOVEMOD"
+while [[ "$1" =~ ^- ]]
+do
+  case "$1" in
+    "-n")
+      NODELETE=1
+      ;;
+    "-r")
+      shift
+      [ -z "$1" ] && errormessage "Please specify mod to remove"
+      REMOVEMOD="$1"
+      
+      [ -z "$MODNAME" ] && [ -d "$REMOVEMOD" ] && MODNAME="$REMOVEMOD"
+      if [ -z "$MODNAME" ]
+      then
+        if [ "$(modlist | grep -i "$REMOVEMOD" | wc -l)" -ne 1 ]
         then
-          rm -v "$REPLY" || exit 1
+          echo "Multiple or no matching mods found for search term \"$REMOVEMOD\""
+          if ! [ -d "$REMOVEMOD" ]
+          then
+            modlist | grep -i --color "$REMOVEMOD"
+            errormessage "Please enter a search term that matches only a single mod"
+          fi
         fi
-      done
-    );
-    
-    echo "Removing $MODNAME/"
-    rm -r "$MODNAME/"
-  done
-  [ -n "$1" ] || exit 0
-fi
+        [ -z "$MODNAME" ] && MODNAME="$(modlist | grep -i "$REMOVEMOD")"
+      fi
+      
+      [ -z "$MODNAME" ] && errormessage "Mod '$REMOVEMOD' cannot be found directly or via search"
+
+      echo "Removing $MODNAME..."
+      
+      pushd "$MODNAME"
+      
+      [[ $(type -t mod_remove) == function ]] && mod_remove "$MODNAME"
+      
+      (
+        IFS=$'\n'
+        for F in $(find . -type f -printf '%P\n')
+        do
+          if [ "$F" -ef "$GAMEDIR/$F" ]
+          then
+            [[ $(type -t file_remove) == function ]] && file_remove "$MODNAME" "$F" "$GAMEDIR/$F"
+            rm -v "$GAMEDIR/$F"
+          else
+            if [ -e "$GAMEDIR/$F" ]
+            then
+              echo "  !!! $GAMEDIR/$F doesn't match mod unpack dir!"
+            fi
+
+            DF="$(find -L "$GAMEDIR/" -samefile "$F")"
+            if [ -r "$DF" ]
+            then
+              [[ $(type -t file_remove) == function ]] && file_remove "$MODNAME" "$F" "$GAMEDIR/$DF"
+              rm -v "$DF"
+            fi
+          fi
+        done
+        for D in $(find . -type d -printf '%P\n' | sort -r)
+        do
+          rmdir -v "$GAMEDIR/$D"
+        done
+      )
+      
+      popd
+      
+      if [ -z "$NODELETE" ]
+      then
+        echo "Removing $MODNAME/"
+        rm -r "$MODNAME/"
+      fi
+      ;;
+    "-u")
+      UNPACKONLY=1
+      ;;
+    "-l")
+      LINKSTYLE="l"
+      ;;
+  esac
+  shift
+done
+
+[ -z "$1" ] && exit 0
 
 [ -r "$1" ] || errormessage "$1 not found"
 
@@ -104,10 +163,33 @@ do
       errormessage "Unrecognized extension $EXT on $ZIP, don't know how to unpack this!"
       ;;
   esac
+  
+  if [ -n "$UNPACKONLY" ]
+  then
+    echo
+    echo "$ZIP unpacked to $DIR/"
+    echo
+    exit 0
+  fi
 
   pushd "$DIR" &>/dev/null || errormessage "pushd failed!"
+  
+  [[ $(type -t mod_add) == function ]] && mod_add "$DIR"
 
-  for D in *; do cp -viRs "$(realpath "$D")" "$GAMEDIR/" || errormessage "symlinking failed!"; done
+  if [ -d "$DIR" ]
+  then
+    cd "$DIR"
+  fi
+
+  (
+    IFS=$'\n'
+    for F in $(find . -type f -printf '%P\n')
+    do
+      [[ $(type -t file_add) == function ]] && file_add "$DIR" "$F" "$GAMEDIR/$(dirname "$F")/"
+      mkdir -p "$GAMEDIR/$(dirname "$F")"
+      cp -viR"$LINKSTYLE" "$(realpath "$F")" "$GAMEDIR/$(dirname "$F")/" || errormessage "linking failed!"
+    done
+  )
 
   popd &>/dev/null
 
