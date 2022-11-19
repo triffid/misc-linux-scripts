@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+# -*- coding:utf-8 -*-
+
+import curses, subprocess, os
+from sys import stderr
+from time import sleep
+
+sections = [
+        { "command": "tail -Fn65536 /var/log/emerge-fetch.log | grep --line-buffered '^>>>'",
+          "heightabsolute": 2 },
+        { "command": "tail -Fn32 /var/log/emerge-fetch.log",
+          "heightrelative": 50 },
+        { "command": "while true; do genlop -cn; sleep 10; done",
+          "heightabsolute": 7 },
+        { "command": "while true; do emerge -pv1O --resume 2>/dev/null | genlop -pn 2>/dev/null | tail -n1; sleep 30; done",
+          "heightabsolute": 2 },
+        { "command": 'tail -Fn32 /var/log/emerge.log | perl -pe "BEGIN { $| = 1; } s/^(\d+)/localtime \$1/e"',
+          "heightrelative": 50 },
+    ]
+
+absheight = 0
+relheight = 0
+for section in sections:
+    section["proc"] = subprocess.Popen(section["command"], shell=True, text=True, bufsize=1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    os.set_blocking(section["proc"].stdout.fileno(), False)
+    section["proc"].stdout.reconfigure(line_buffering = True)
+    if "heightabsolute" in section:
+        absheight += section["heightabsolute"]
+    if "heightrelative" in section:
+        relheight += section["heightrelative"]
+
+def sizewin(win):
+    e = win.getmaxyx()
+    print("e = %d, %d\n" % (e[0], e[1]))
+    maxy = e[0] - 2
+    maxx = e[1] - 2
+    
+    propheight = maxy - absheight
+    
+    # TODO: complain if propheight is small or negative, ie not enough lines in the terminal 
+    
+    cury = 1
+    for section in sections:
+        winh = 0
+        if "heightabsolute" in section:
+            winh = section["heightabsolute"]
+        else:
+            winh = int(section["heightrelative"] * propheight / relheight)
+
+        if "win" not in section:
+            section["win"] = win.derwin(winh, maxx, cury, 1)
+            section["win"].scrollok(True)
+            section["win"].idlok(True)
+        else:
+            (y, x) = section["win"].getmaxyx()
+            if (y < winh):
+                section["win"].mvwin(cury, 1)
+                section["win"].resize(winh, maxx)
+            else:
+                section["win"].resize(winh, maxx)
+                section["win"].mvwin(cury, 1)
+            section["win"].redrawwin()
+        cury += winh
+
+def main(win):
+    curses.curs_set(0)
+    win.timeout(250)
+    win.clear()
+
+    sizewin(win)
+
+    i = 0
+    key = None
+
+    while True:
+        lt = 1
+        
+        while lt > 0:
+            lt = 0
+            for section in sections:
+                try:
+                    l = section["proc"].stdout.readline()
+                except:
+                    pass
+                else:
+                    if len(l) > 0:
+                        section["win"].addstr(l)
+                        section["win"].refresh()
+                        lt += len(l)
+
+        win.refresh()
+        
+        key = win.getch()
+
+        if key == curses.KEY_RESIZE:
+            sizewin(win)
+            win.redrawwin()
+            win.refresh()
+
+curses.wrapper(main)
+
+for section in sections:
+    try:
+        section["proc"].kill()
+        section["proc"].communicate()
+    except:
+        pass
