@@ -18,8 +18,8 @@ def getbest(es, r1dec, r2dec):
 	return r
 
 def siprefix(val):
-	gr = min(max(int(floor(log10(val) / 3)), -8), 8)
-	return "%1.2f%s"%(val / (10 ** (3 * gr)), (gr != 0 and "yzafpnum_kMGTPEZY"[gr + 8]) or "")
+	gr = min(max(int(floor(log10(val) / 3)), -10), 10)
+	return "%1.2f%s"%(val / (10 ** (3 * gr)), (gr != 0 and "qryzafpnum_kMGTPEZYRQ"[gr + 10]) or "")
 
 eseries = {
 	 3: [100, 220, 470],
