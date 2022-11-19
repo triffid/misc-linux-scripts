@@ -15,6 +15,8 @@ function usage {
 	echo "Usage: ${0##*/} [-c chunksize] [-j concurrent downloads] [-o outfile] [-u username] [-C cookiejar] [-d delay] [--sha1sum checksum] [--sha256sum checksum] [--md5sum checksum] url [[options] url] …"
 }
 
+function urldecode() { : "${*//+/ }"; echo -e "${_//%/\\x}"; }
+
 if [ -z "$1" ]
 then
 	usage
@@ -89,7 +91,7 @@ do
 				;;
 			"-c")
 				shift
-				CHUNKSIZE=$(($1 + 0))
+				CHUNKSIZE="$(( $(sed -E 's/([0-9]+)[gG].*/\1 * 1073741824/; s/([0-9]+)M.*/\1 * 1048576/; s/([0-9]+)[kK].*/\1 * 1024/' <<< "$1") + 0 ))"
 				;;
 			"-o")
 				shift
@@ -151,8 +153,27 @@ do
 			read -s PASS
 		fi
 
-		# SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$@" "$URL" | tee /dev/stderr | perl -ne 'BEGIN { $s = 0; } /Content-Length:\s*(\d+)/i && do { $s = $1 if $1 > $s }; /Content-Range:\s*bytes\s+(\d+)-(\d+)\/(\d+)/i && do { $s = $3 if $3 > $s; }; END { print "$s\n"; }')
-		SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$URL" | tee /dev/stderr | grep -i "^Content-Range:" | cut -d/ -f2 | tr -d $'\r')
+		#SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$URL" | tee /dev/stderr | grep -i "^Content-Range:" | cut -d/ -f2 | tr -d $'\r')
+		HEADER="$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$URL" | tee /dev/stderr)"
+		SIZE=$(echo "$HEADER" | grep -i "^Content-Range:" | cut -d/ -f2 | tr -d $'\r')
+		
+		if grep -qi 'Content-Disposition:' <<< "$HEADER"
+		then
+			FN="$(grep -i '^Content-Disposition:' <<< "$HEADER" | cut -d: -f2)"
+			echo "Got new filename $FN"
+			exit 0 # TODO: actually extract FN from content-disposition header properly
+		else
+			if grep -qi 'Location:' <<< "$HEADER"
+			then
+				FN="$(grep -i 'Location:' <<< "$HEADER" | tail -n1 | sed -e 's/\r//g')"
+				FN="${FN##*/}"
+				FN="$(urldecode "$FN")"
+				echo
+				echo "Filename changed to '$FN' via redirect"
+				echo
+				FNAME="$FN"
+			fi
+		fi
 
 		echo "Size is '$SIZE'"
 
