@@ -1,0 +1,5 @@
+#!/bin/bash
+
+qdbus org.kde.KWin /Compositor suspend
+sleep 0.5
+qdbus org.kde.KWin /Compositor resume
