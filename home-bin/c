@@ -2,7 +2,21 @@
 
 TEMP=$(mktemp -p $HOME/temp --suffix=.c)
 
-cat <<'ENDHEAD' > "$TEMP"
+# cat <<'ENDHEAD' > "$TEMP"
+
+declare -a CFLAGS
+
+CFLAGS="-std=gnu++11 "
+CFLAGS="$(pkg-config --cflags eigen3) "
+CFLAGS=-I"\"$PWD\" "
+
+while [[ "$1" =~ ^- ]] || [[ -f "$1" ]]
+do
+	CFLAGS="$1"
+	shift
+done
+
+g++ -xc++ "${CFLAGS[@]}" -o "${TEMP%%.c}" - <<ENDTAIL
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,37 +38,9 @@ cat <<'ENDHEAD' > "$TEMP"
 
 int main(int argc, char** argv)
 {
-ENDHEAD
-
-declare -a CFLAGS
-
-CFLAGS="-std=gnu++11 "
-CFLAGS="$(pkg-config --cflags eigen3) "
-CFLAGS=-I"\"$PWD\" "
-
-while [[ "$1" =~ ^- ]] || [[ -f "$1" ]]
-do
-	CFLAGS="$1"
-	shift
-done
-
-if [[ "$#" -gt 0 ]]
-then
-	#echo $'\t'"$@" >> "$TEMP"
-	while [[ "$#" -gt 0 ]]
-	do
-		echo $'\t'"$1" >> "$TEMP"
-		shift
-	done
-else
-	cat >> "$TEMP"
-fi
-
-cat <<'ENDTAIL' >> "$TEMP"
+$([[ "$#" -gt 0 ]] && echo "$@" || cat)
 }
 ENDTAIL
-
-g++ "${CFLAGS[@]}" -o "${TEMP%%.c}" "$TEMP" -lm || exit 1
 
 "${TEMP%%.c}"
 EXITCODE=$?
