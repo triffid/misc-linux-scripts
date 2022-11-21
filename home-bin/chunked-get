@@ -159,9 +159,15 @@ do
 		
 		if grep -qi 'Content-Disposition:' <<< "$HEADER"
 		then
-			FN="$(grep -i '^Content-Disposition:' <<< "$HEADER" | cut -d: -f2)"
-			echo "Got new filename $FN"
-			exit 0 # TODO: actually extract FN from content-disposition header properly
+			FN="$(grep -i '^Content-Disposition:' <<< "$HEADER" | cut -d: -f2 | sed -E 's/^.*filename="([^"]+)".*$/\1/;')"
+			echo "Got new filename \"$FN\""
+			# TODO: check sanity of filename
+			if [ -n "$FN" ]
+			then
+				FNAME="$FN"
+			else
+				exit 1
+			fi
 		else
 			if grep -qi 'Location:' <<< "$HEADER"
 			then
