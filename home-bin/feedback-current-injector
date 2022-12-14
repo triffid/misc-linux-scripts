@@ -76,7 +76,7 @@ for Rbt in es:
     Ric = rclose(Ri)
     print("Ri: %sΩ (%sΩ is %+2.2f%%)" % (siprefix(Ri), siprefix(Ric), 100 * (Ric/Ri - 1)))
     
-    print("Vmax = %sV" % siprefix(((0    - Vfb) / Ric - Irb) * -Rtc + Vfb))
-    print("Vmin = %sV" % siprefix(((Vdac - Vfb) / Ric - Irb) * -Rtc + Vfb))
+    print("Vmax = %sV (%+2.2f%%)" % (siprefix(((0    - Vfb) / Ric - Irb) * -Rtc + Vfb), 100 * ((((0    - Vfb) / Ric - Irb) * -Rtc + Vfb)/Vmax - 1)))
+    print("Vmin = %sV (%+2.2f%%)" % (siprefix(((Vdac - Vfb) / Ric - Irb) * -Rtc + Vfb), 100 * ((((Vdac - Vfb) / Ric - Irb) * -Rtc + Vfb)/Vmin - 1)))
     
     print()
