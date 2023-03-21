@@ -13,7 +13,7 @@ done
 
 while [ -n "$1" ]
 do
-	for F in $(find /var/db/pkg -name CONTENTS -exec egrep -l '\b'"$1"'\b' {} +)
+	for F in $(find /var/db/pkg -name CONTENTS -exec grep -lFw "$1" {} +)
 	do
 		PNAME="$(cut -d/ -f5-6 <<< "$F")"
 		if egrep -q "${1}( .*|)$" "$F"; then
