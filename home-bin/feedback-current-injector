@@ -60,23 +60,47 @@ print("Vout: %g-%gV\nVdac: %gV\nVfb : %gV\n" % (Vmin, Vmax, Vdac, Vfb))
 
 # ((0    - Vfb) / Ri - Vfb / Rb) * -Rt + Vfb = Vmax
 
+results=[]
+
 def rclose(val):
     mul = 10 ** (floor(log10(val)) - 2)
     return list(sorted(es, key=lambda x: abs(x * mul - val)))[0] * mul
 
 for Rbt in es:
+    Rbt *= 10
     Irb = Vfb / Rbt;
-    print("Irb: %sA" % siprefix(Irb))
     
     Rt = (((Vmax - Vmin) * (1 - (Vfb / Vdac))) + Vmin - Vfb) * Rbt / Vfb
     Rtc = rclose(Rt)
-    print("Rb: %sΩ, Rt: %sΩ (%sΩ is %+2.2f%%)" % (siprefix(Rbt), siprefix(Rt), siprefix(Rtc), 100 * (Rtc/Rt - 1)));
     
     Ri = (Vdac - Vfb) / ((Vmin - Vfb) / -Rt + Vfb / Rbt)
     Ric = rclose(Ri)
-    print("Ri: %sΩ (%sΩ is %+2.2f%%)" % (siprefix(Ri), siprefix(Ric), 100 * (Ric/Ri - 1)))
     
-    print("Vmax = %sV (%+2.2f%%)" % (siprefix(((0    - Vfb) / Ric - Irb) * -Rtc + Vfb), 100 * ((((0    - Vfb) / Ric - Irb) * -Rtc + Vfb)/Vmax - 1)))
-    print("Vmin = %sV (%+2.2f%%)" % (siprefix(((Vdac - Vfb) / Ric - Irb) * -Rtc + Vfb), 100 * ((((Vdac - Vfb) / Ric - Irb) * -Rtc + Vfb)/Vmin - 1)))
+    xVmax   =  ((0    - Vfb) / Ric - Irb) * -Rtc + Vfb;
+    VmaxErr = xVmax/Vmax - 1
+    xVmin   =  ((Vdac - Vfb) / Ric - Irb) * -Rtc + Vfb
+    VminErr = xVmin/Vmin - 1
+    
+    results.append([Irb, Rbt, Rt, Rtc, Rtc/Rt-1, Ri, Ric, Ric/Ri-1, xVmax, VmaxErr, xVmin, VminErr, (VmaxErr ** 2) + (VminErr ** 2)])
+
+results.sort(key=itemgetter(12))
+
+for i in range(0,3):
+    r=results[i]
+    Irb = r[0]
+    Rbt = r[1]
+    Rt  = r[2]
+    Rtc = r[3]
+    Ri  = r[5]
+    Ric = r[6]
+    xVmax = r[8]
+    VmaxErr = r[9]
+    xVmin = r[10]
+    VminErr = r[11]
+    print("Irb: %sA" % siprefix(Irb))
+    print("Rb: %sΩ, Rt: %sΩ (%sΩ is %+2.2f%%)" % (siprefix(Rbt), siprefix(Rt), siprefix(Rtc), 100 * (Rtc/Rt - 1)));
+    print("Ri: %sΩ (%sΩ is %+2.2f%%)" % (siprefix(Ri), siprefix(Ric), 100 * (Ric/Ri - 1)))
+    print("Vmax = %sV (%+2.2f%%)" % (siprefix(xVmax), 100 * VmaxErr))
+    print("Vmin = %sV (%+2.2f%%)" % (siprefix(xVmin), 100 * VminErr))
     
     print()
