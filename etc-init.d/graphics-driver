@@ -12,46 +12,23 @@
 #     emerge nvidia-drivers && service graphics-driver restore when updating your drivers and kernel
 #     make xdm depend on this
 
-# extra_commands="save restore"
-
-# CURRENTVER=$(cd /var/db/pkg/x11-drivers/; echo nvidia-drivers-* | sed -E 's/\-r[0-9]+$//')
-# KERNELVER=$(< /sys/module/nvidia/version)
-
 depend() {
 	need localmount
 	before xdm
 }
 
-#restore() {
-#	if [ ! -f "/usr/portage/packages/x11-drivers/${CURRENTVER}.tbz2" ]
-#	then
-#		save
-#	fi
-#	if [ ! -d "/var/db/pkg/x11-drivers/nvidia-drivers-${KERNELVER}" ]
-#	then
-#		emerge -Ku1Oq "~x11-drivers/nvidia-drivers-${KERNELVER}"
-#	fi
-#}
-
-#save() {
-#	quickpkg --include-config=y x11-drivers/nvidia-drivers
-#}
-
 start() {
-#	if [ "$CURRENTVER" != "$KERNELVER" ]
-#	then
-#		restore
-#	fi
-	if emerge -u1KO nvidia-drivers && lsmod | grep -q nvidia && ! nvidia-smi
+	NVPKG="$(strings /lib/modules/$(uname -r)/video/nvidia.ko | grep x11-drivers/nvidia-drivers | head -n1 | grep -o 'x11-drivers.*' | cut -d/ -f1-2)"
+	if ! [ -d "/var/db/pkg/$NVPKG" ]
 	then
-		rmmod nvidia_drm nvidia_modeset nvidia && modprobe nvidia
+		echo "Want $NVPKG, have $(echo /var/db/pkg/x11-drivers/nvidia-driver* | cut -d/ -f5-6)"
+		if emerge -u1KO "=$NVPKG" && [ -d /sys/module/nvidia ] && ! nvidia-smi
+		then
+			rmmod nvidia_drm nvidia_modeset nvidia && modprobe nvidia
+		fi
 	fi
 }
 
 stop() {
-#	if [ ! -f "/usr/portage/packages/x11-drivers/${CURRENTVER}.tbz2" ]
-#	then
-#		save
-#	fi
 	emerge -u1KO nvidia-drivers
 }

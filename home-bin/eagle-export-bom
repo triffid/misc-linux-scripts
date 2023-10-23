@@ -72,34 +72,14 @@ my %schparts;
 for my $part ($sch->findnodes('/eagle/drawing/schematic/parts/part')) {
 	next if $part->{library} =~ qw/testpad testpoint/ or $part->{package} ~~ qw/2PT_GND_TIE/;
 	$schparts{$part->{name}} = {} unless $schparts{$part->{name}};
-# 	die $part;
 	for my $attr ($part->findnodes('./@*')) {
 		$schparts{$part->{name}}->{$attr->nodeName} = $attr->value;
 	}
 	for my $attr ($part->findnodes('./attribute')) {
-# 		print $attr->{name} . '=' . $attr->{value};
-# 		print Dumper \$attr->{name};
 		$schparts{$part->{name}}->{attributes}->{$attr->{name}} = $attr->{value};
-# 		print '$schparts{'.$part->{name}.'}->{'.$attr->{name}.'} = '.$attr->{value}.";\n";
 		push @attrs, $attr->{name} unless $attr->{name} ~~ [@attrs,qw/NAME VALUE SF_SKU PROD_ID/];
 	}
-# 	die Dumper \$schparts{$part->{name}} if $part->{name} =~ /C7/;
 }
-
-# for my $part ($sch->findnodes('/eagle/drawing/schematic/sheets/sheet/*/parts/part')) {
-# 	next if $part->{library} =~ qw/testpad testpoint/ or $part->{package} ~~ qw/2PT_GND_TIE/;
-# 	$schparts{$part->{name}} = {} unless $schparts{$part->{name}};
-# # 	die $part;
-# 	for my $attr ($part->findnodes('./@*')) {
-# 		$schparts{$part->{name}}->{$attr->nodeName} = $attr->value;
-# 	}
-# 	for my $attr ($part->findnodes('./attribute')) {
-# 		$schparts{$part->{name}}->{attributes}->{$attr->{name}} = $attr->{value};
-# # 		print '$schparts{'.$part->{name}.'}->{'.$attr->{name}.'} = '.$attr->{value}.";\n";
-# 		push @attrs, $attr->{name} unless $attr->{name} ~~ @attrs;
-# 	}
-# # 	die Dumper \$schparts{$part->{name}} if $part->{name} =~ /C7/;
-# }
 
 my %parts;
 
@@ -115,18 +95,10 @@ for my $element ($brd->findnodes('/eagle/drawing/board/elements/element')) {
 	}
 }
 
-# die Dumper \%parts;
-
-# die Dumper \@attrs;
-
-# die $descr{'D/' . $schparts{FB1}{library} . '/' . $schparts{FB1}{deviceset}};
-
 my %packval;
 
 for my $part (keys %parts) {
 	my $pv = join ":", @{$parts{$part}}{qw/value package library/}, @{$parts{$part}->{attributes}}{@attrs};
-# 	print $pv."\n";
-# 	die Dumper \@{$parts{$part}->{attributes}}{@attrs}, \@attrs if @parts{$part}->{attributes}{MF};
 	$packval{$pv} = [] unless defined $packval{$pv};
 	push @{$packval{$pv}}, $part;
 }
@@ -144,7 +116,6 @@ printf '"%s"'."\n", join '","', @columns;
 
 for (@packval) {
 	my $desc;
-# 	print Dumper $parts{$packval{$_}->[0]};
 	$desc = $descr{'D/' . $parts{$packval{$_}->[0]}->{library} . '/' . $parts{$packval{$_}->[0]}->{deviceset}}
 		unless $desc;
 	do {

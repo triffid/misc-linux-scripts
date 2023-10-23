@@ -1,3 +1,4 @@
 #!/bin/bash
 
-curl -s -m 5 'https://api.imgur.com/post/v1/albums/UnuUU' | jq .code | grep -v ^4
+( ! curl -s -m 5 'https://imgur.com/a/UnuUU' | jq -ce '.success' | grep false ) # && ( curl -m 5 'https://i.imgur.com/bhx9vVW.png' > /dev/null )
+# ! curl -s -m 5 'https://api.imgur.com/post/v1/albums/UnuUU' | jq -ce '.errors'

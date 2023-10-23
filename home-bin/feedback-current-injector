@@ -82,7 +82,7 @@ for Rbt in es:
     xVmin   =  ((Vdac - Vfb) / Ric - Irb) * -Rtc + Vfb
     VminErr = xVmin/Vmin - 1
     
-    results.append([Irb, Rbt, Rt, Rtc, Rtc/Rt-1, Ri, Ric, Ric/Ri-1, xVmax, VmaxErr, xVmin, VminErr, (VmaxErr ** 2) + (VminErr ** 2)])
+    results.append([Irb, Rbt, Rt, Rtc, Rtc/Rt-1, Ri, Ric, Ric/Ri-1, xVmax, VmaxErr, xVmin, VminErr, (VmaxErr ** 4) + (VminErr ** 4)])
 
 results.sort(key=itemgetter(12))
 

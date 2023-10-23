@@ -4,6 +4,8 @@
 
 unset UNMOUNT
 
+[ -n "$CHROOT" ] && exit 0
+
 logger -t installkernel "installkernel '$0' '$1' '$2' '$3' '$4' '$5'"
 
 #installkernel '/home/triffid/bin/installkernel' '5.1.7-gentoo-dorellan' 'arch/x86/boot/bzImage' 'System.map' '/boot' ''
@@ -79,15 +81,15 @@ else
 	exit 1
 fi
 
-if [ -f /boot/EFI/initramfs.gz ]
+if ! [ -f /boot/EFI/initramfs.gz ]
 then
     echo "Updating initramfs…"
     make-initramfs.sh /boot/EFI/initramfs.gz || exit 1
 fi
 
-echo -n "*** Setting linux.efi as next boot... "
-efibootmgr -n $(efibootmgr -v | grep linux.efi | cut -b5-8)
-echo "OK"
+#echo -n "*** Setting linux.efi as next boot... "
+#efibootmgr -n $(efibootmgr -v | grep linux.efi | cut -b5-8)
+#echo "OK"
 
 if [ -n "$UNMOUNT" ]
 then

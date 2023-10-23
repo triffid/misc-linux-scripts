@@ -18,7 +18,7 @@ do
 	xinput set-prop $N "Device Accel Profile" 2
 	xinput set-prop $N "Device Accel Constant Deceleration" 1
 	xinput set-prop $N "Device Accel Adaptive Deceleration" 3
-	xinput set-prop $N "Device Accel Velocity Scaling" 1.5
+	xinput set-prop $N "Device Accel Velocity Scaling" 1.0
 done
 
 # for I in $(solaar show | egrep '^  [0-9]+: ' | cut -d: -f1)

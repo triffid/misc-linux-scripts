@@ -23,6 +23,12 @@ restore() {
 	else
 		ebegin "No saved rules"
 	fi
+
+	# load rules for named
+	for IP in $(grep forwarders /etc/bind/named.conf  | tail -n1 | perl -ne '/\{(.*)\}/ && print"$1\n";' | perl -pe 's/;/ /g'); do ip rule add to $IP lookup china pref 1111; done
+
+	true
+
 	eend $?
 }
 

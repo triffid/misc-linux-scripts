@@ -12,7 +12,7 @@ sections = [
           "heightrelative": 50 },
         { "command": "while true; do genlop -cn; sleep 10; done",
           "heightabsolute": 7 },
-        { "command": "while true; do jq -r '\"[ebuild   R   ] \" + (.resume.mergelist | .[][2])' /var/cache/edb/mtimedb | emlop p --limit 3 --duration human 2>/dev/null | tail -n1; sleep 10; done",
+        { "command": "while true; do jq -r '\"[ebuild   R   ] \" + (.resume.mergelist | .[][2])' " + os.getenv('SYSROOT','') + "/var/cache/edb/mtimedb | emlop p --limit 3 --duration human 2>/dev/null | tail -n1; sleep 10; done",
           "heightabsolute": 2 },
         { "command": 'tail -Fn32 /var/log/emerge.log | perl -pe "BEGIN { $| = 1; } s/^(\d+)/localtime \$1/e"',
           "heightrelative": 50 },

@@ -6,15 +6,16 @@ RPC=/transmission/rpc
 
 while [[ -n "$1" ]]
 do
-	if [[ "$1" =~ ([A-Fa-f0-9]{40}) ]]
+	if [[ "$1" =~ ([A-Fa-f0-9]{32}.?) ]]
 	then
 		echo "Got HASH ${BASH_REMATCH[1]}"
 
-		#echo "d10:magnet-uri${#1}:${1}e" > "meta-${BASH_REMATCH[1]}.torrent"
-
 		SESSION="$(curl -D - --data '{"method":"session-get"}' http://$HOST:$PORT$RPC 2>/dev/null | grep X-Transmission-Session-Id | head -n1 | tr -d '\r')"
-
 		curl -H "$SESSION" -H 'Content-Type: application/json' --data '{"method":"torrent-add","arguments":{"paused":false,"filename":"magnet:?xt=urn:btih:'${BASH_REMATCH[1]}'"}}' http://$HOST:$PORT$RPC; echo
+	else
+		echo "Hash unrecognised, trying as-is"
+		SESSION="$(curl -D - --data '{"method":"session-get"}' http://$HOST:$PORT$RPC 2>/dev/null | grep X-Transmission-Session-Id | head -n1 | tr -d '\r')"
+		curl -H "$SESSION" -H 'Content-Type: application/json' --data '{"method":"torrent-add","arguments":{"paused":false,"filename":"magnet:?xt=urn:btih:'"$1"'"}}' http://$HOST:$PORT$RPC; echo
 	fi
 
 	shift

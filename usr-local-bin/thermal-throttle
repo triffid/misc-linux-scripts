@@ -9,7 +9,7 @@ TEMP="$1"
 
 if [ -z "$TEMP" ]
 then
-	TEMP=95
+	TEMP=90
 fi
 
 if ! [[ "$TEMP" =~ [0-9]+ ]]
