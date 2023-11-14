@@ -1,10 +1,5 @@
 #!/usr/bin/perl
 
-#!/bin/bash
-
-# perl -pi~ -e 's/name="([^"]+)"\s+urn="urn:adsk.eagle:library:(\d+)"/name="$1-$2"/; s/library="([^"]+)"\s+library_urn="urn:adsk.eagle:library:(\d+)"/library="$1-$2"/;' "$@"
-
-
 # eagle-fix-v9-dup-libs
 #
 # Copyright (C) 2017-2022 Michael Moon
