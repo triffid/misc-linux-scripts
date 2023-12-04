@@ -39,10 +39,11 @@ for e in r.findall('./drawing/board/elements/'):
 		attr_str  = ""
 		for a in sorted(e.findall('./'), key=lambda n: str.lower(n.attrib['name'])):
 			if ('value' in a.attrib):
-				attr_dict[a.attrib['name']] = a.attrib['value']
-				attr_str += "%s:%s\t" % (a.attrib['name'], a.attrib['value'])
-				if (attrs.count(a.attrib['name']) == 0):
-					attrs += [a.attrib['name']]
+				if (len(a.attrib["value"])):
+					attr_dict[a.attrib['name']] = a.attrib['value']
+					attr_str += "%s:%s\t" % (a.attrib['name'], a.attrib['value'])
+					if (attrs.count(a.attrib['name']) == 0):
+						attrs += [a.attrib['name']]
 		key = ':'.join([e.attrib['package'], e.attrib['value'], attr_str])
 		#pprint(e.attrib)
 		if (key not in resultset):
@@ -52,6 +53,13 @@ for e in r.findall('./drawing/board/elements/'):
 			resultset[key] = [e.attrib['value'], e.attrib['package'], descr, attr_dict, [e.attrib['name']]]
 		else:
 			resultset[key][4] += [e.attrib['name']]
+		# add mating elements to BOM
+		if ('MATING' in attr_dict):
+			mkey = ':'.join([attr_dict['MATING'], "MATING:"+e.attrib['value'], attr_str])
+			if (mkey not in resultset):
+				resultset[mkey] = [attr_dict['MATING'], attr_dict['MATING'], "MATING:"+e.attrib['value'], {"MPN": attr_dict['MATING'], "MF": attr_dict['MF']}, ["MATING:"+e.attrib['name']]]
+			else:
+				resultset[mkey][4] += ["MATING:"+e.attrib['name']]
 
 rows = []
 
