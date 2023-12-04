@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Upload</title>
+		<style>
+			* {
+				font-size: 12pt;
+			}
+			.fileinput {
+				text-shadow: #FFF 0 0 10px;
+			}
+			.fileinfo {
+				height: 2em;
+				vertical-align: middle;
+				border: 1px solid black;
+			}
+			.namediv {
+				position: absolute;
+				margin: 0;
+				padding: 0.5em 0 0.5em 0.5em;
+				text-shadow: #FFF -1px  0   2px,
+							 #FFF  1px  0   2px,
+							 #FFF  0   -1px 2px,
+							 #FFF  0    1px 2px;
+			}
+			.percentdiv {
+				position: absolute;
+				right: 0;
+				margin: 0 1em 0 0;
+				padding: 0.5em 0.5em 0.5em 0;
+				text-shadow: #FFF 0 0 10px;
+			}
+			.chunk {
+				float: left;
+				height: 2em;
+			}
+			.chunkprogress {
+				height: 100%;
+				background: repeating-linear-gradient(75deg, #A08020, #A08020 4px, #FF8030, #FF8030 8px);
+			}
+			.chunkcomplete {
+				height: 100%;
+				background: repeating-linear-gradient(75deg, #208020, #208020 4px, #30FF30, #30FF30 8px);
+			}
+			.chunkerror {
+				height: 100%;
+				background: repeating-linear-gradient(75deg, #A00000, #A00000 4px, #FF0000, #FF0000 8px);
+			}
+		</style>
+	</head>
+	<body>
+		<input class="fileinput" type="file" id="file" multiple /><br/>
+		<div id="file-info" class="file-info"></div>
+		
+		<script>
+			const input = document.querySelector('#file');
+			const progress = document.querySelector('#file-info');
+			const chunksize = 2**24;
+			const threadcount = 4;
+			jobs = [];
+			const upload_url = window.location.href.match(/^.*\//) + "cgi-bin/upload";
+			
+			input.addEventListener('change', function () {
+				for (const file of input.files) {
+					console.log(file);
+					const filediv = document.createElement('div');
+					filediv.id = encodeURI(file.name);
+					filediv.className = 'fileinfo';
+					progress.append(filediv);
+					
+					const filenamediv = document.createElement('div');
+					filenamediv.className = 'namediv';
+					filenamediv.textContent = `${file.name}`;
+					filediv.append(filenamediv);
+
+					const percentdiv = document.createElement('div');
+					percentdiv.className = 'percentdiv';
+					percentdiv.textContent = '0%';
+					filediv.append(percentdiv);
+					
+					const chunkCount = Math.ceil(file.size / chunksize);
+					console.log(chunkCount);
+
+					for (const i of Array(chunkCount).keys()) {
+						(function() {
+							const chunkdiv = document.createElement('div');
+							chunkdiv.id = encodeURI(file.name) + "chunk" + i;
+							chunkdiv.className = "chunk";
+							chunkdiv.style = "width: " + (100 / chunkCount) + "%";
+							
+							const chunkcomplete = document.createElement('div');
+							chunkcomplete.id = encodeURI(file.name) + "chunkcomplete" + i;
+							chunkcomplete.style = "width: 0%";
+							chunkcomplete.className = "chunkprogress";
+							chunkdiv.append(chunkcomplete);
+							
+							filediv.append(chunkdiv);
+							
+							const chunkstart = i * chunksize;
+							const chunkend = Math.min(chunkstart + chunksize, file.size);
+							const chunkForm = new FormData();
+							chunkForm.append('file', file.slice(chunkstart, chunkend), file.name);
+							
+							const upload_req = new XMLHttpRequest();
+							upload_req.upload.addEventListener("progress", function(e) {
+								console.log("file " + file.name + " chunk " + i + "/" + chunkCount + ": progess");
+								if (e.lengthComputable) {
+									chunkcomplete.style = "width: " + (100 * e.loaded / e.total) + "%";
+								}
+							});
+							upload_req.addEventListener("timeout", function(e) {
+								console.log("file " + file.name + " chunk " + i + "/" + chunkCount + ": timeout");
+								if (e.lengthComputable) {
+									chunkcomplete.style = "width: " + (100 * e.loaded / e.total) + "%";
+									chunkcomplete.class = "chunkerror";
+								}
+							});
+							upload_req.addEventListener("error", function(e) {
+								console.log("file " + file.name + " chunk " + i + "/" + chunkCount + ": error");
+								if (e.lengthComputable) {
+									chunkcomplete.style = "width: " + (100 * e.loaded / e.total) + "%";
+									chunkcomplete.class = "chunkerror";
+								}
+							});
+							upload_req.addEventListener("load", function (e) {
+								console.log("file " + file.name + " chunk " + i + "/" + chunkCount + ": load");
+								console.log(e);
+								if ((e.target.status >= 200) && (e.target.status < 300)) {
+									chunkcomplete.className = "chunkcomplete";
+									chunkcomplete.style = "width: 100%";
+									var job = jobs.shift();
+									job.xmlhttpreq.send(job.form);
+								}
+								else {
+									chunkcomplete.className = "chunkerror";
+									chunkcomplete.style = "width: 100%";
+									console.log(chunkcomplete);
+								}
+							});
+							upload_req.open("POST", upload_url, true);
+							upload_req.setRequestHeader('Content-Range', "bytes " + chunkstart + "-" + (chunkend-1) + "/" + file.size);
+							
+							jobs.push({ xmlhttpreq: upload_req, form: chunkForm});
+						})();
+					}
+				}
+				console.log(jobs);
+				for (const i of Array(threadcount).keys()) {
+					var job = jobs.shift();
+					job.xmlhttpreq.send(job.form);
+				}
+			});
+		</script>
+	</body>
+</html>

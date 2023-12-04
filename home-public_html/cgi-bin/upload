@@ -1,0 +1,93 @@
+#!/usr/bin/perl -w
+
+use strict;
+use warnings;
+use CGI;
+use CGI::Carp qw(fatalsToBrowser);
+use File::Temp;
+use File::Copy qw(move);
+
+use Data::Dumper;
+use File::MimeInfo;
+use File::Find;
+use Fcntl qw(:flock);
+
+$CGI::POST_MAX = 2**25; # max 32MB
+
+my $upload_dir = '/home/triffid/Share/Uplink/';
+
+my $q = new CGI;
+
+if ($ENV{REQUEST_METHOD} eq "GET") {
+	print $q->header(-location => '../upload.html');
+}
+elsif ($ENV{REQUEST_METHOD} eq "POST") {
+	my $filename = $q->param("file");
+	$filename =~ s/.*[\/\\](.*)/$1/;
+	my $upload_filehandle = $q->upload("file");
+	my $cr = $ENV{HTTP_CONTENT_RANGE};
+	
+	if ($cr =~ m!bytes\s+(\d+)-(\d+)/(\d+)!) {
+		my ($start, $end, $total) = ($1, $2, $3);
+		my $fnbase = "${upload_dir}._${filename}_";
+		my $fn = "${fnbase}${start}-${end}_${total}";
+		open(FH, '>', $fn) or die "open $fn failed: $!";
+		print FH while (<$upload_filehandle>);
+		close(FH);
+		print $q->header("text/json");
+		my @files = glob($fnbase."*");
+		my $reassemble = 0;
+		my $validchunks = 0;
+		my $totalsize = 0;
+		for my $file (@files) {
+			#print("$file\n");
+			if ($file =~ m!^(.*)_(\d+)-(\d+)_(\d+)$!) {
+				my ($filebase, $fstart, $fend, $ftotal) = ($1, $2, $3, $4);
+				my $fsize = -s $file;
+				#print("<$start - $end - $total - $size>\n");
+				if ($fsize == ($fend + 1 - $fstart)) {
+					$validchunks++;
+					$totalsize += $fsize;
+					#printf("s %u e %u t %u fs %u fe %u ft %u fz %u tz %u\n", $start, $end, $total, $fstart, $fend, $ftotal, $fsize, $totalsize);
+					if (($totalsize == $ftotal) && ($total == $ftotal)) {
+						$reassemble = 1;
+					}
+				}
+				else {
+					#printf("%u != %u\n", $fsize, ($fend + 1 - $fstart));
+				}
+			}
+		}
+		if ($reassemble) {
+			if (-e $upload_dir.$filename) {
+				my $i = 1;
+				$i++ while (-e "$filename-$i");
+				$filename = "$filename-$i";
+			}
+			open DF, ">", $upload_dir.$filename or die "open $filename: $!";
+			flock(DF, LOCK_EX | LOCK_NB) or die "could not lock $filename";
+			binmode DF;
+			for my $file (@files) {
+				if ($file =~ m!^(.*)_(\d+)-(\d+)_(\d+)$!) {
+					my ($filebase, $fstart, $fend, $ftotal) = ($1, $2, $3, $4);
+
+					open SF, "<", $file or die "open $file: $!";
+					binmode SF;
+					seek DF, $fstart, 0 or die "seek $filename, $fstart failed: $!";
+					read SF, my $buffer, -s $file;
+					print DF $buffer;
+					close SF;
+
+					unlink $file;
+				}
+			}
+			flock(DF, LOCK_UN);
+			close DF;
+		}
+		print '{ "status": "ok", ' . "\"chunks\": $validchunks, \"size\": $totalsize, \"reassemble\": $reassemble }";
+	}
+	else {
+		print $q->header("text/html");
+		die(Dumper \%ENV);
+	}
+}
