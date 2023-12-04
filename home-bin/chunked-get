@@ -159,7 +159,11 @@ do
 		
 		if grep -qi 'Content-Disposition:' <<< "$HEADER"
 		then
-			FN="$(grep -i '^Content-Disposition:' <<< "$HEADER" | cut -d: -f2 | sed -E 's/^.*filename="([^"]+)".*$/\1/;')"
+			FN="$(grep -i '^Content-Disposition:' <<< "$HEADER" | sed -E 's/\r//g;' | cut -d: -f2 | sed -E 's/^.*filename="([^"]+)".*$/\1/;')"
+			if grep -qi 'filename=' <<< "$FN"
+			then
+				FN="$(sed -E 's/^.*filename=(.*?)\r?\b/\1/;' <<< "$FN")"
+			fi
 			echo "Got new filename \"$FN\""
 			# TODO: check sanity of filename
 			if [ -n "$FN" ]
