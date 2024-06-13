@@ -1,31 +1,15 @@
 #!/bin/bash
 
+SCREENSHOT_DIR="$HOME/Screenshots"
+
 NOW="$(date -Ins)"
 
 DATETIME="$(date -d"${NOW}" +%Y%m%d-%H%M%S)"
-DIR="$HOME/Screenshots/$(date -d"${NOW}" +%Y/%Y%m)"
-
-mkdir -p "$DIR" && ln -nfs "$DIR" ~/Screenshots/latest
-
+DIR="$SCREENSHOT_DIR/$(date -d"${NOW}" +%Y/%Y%m)"
 FILE="$DIR/screenshot-$DATETIME.png"
-TRIES=0
-while [ $TRIES -le 10 ] && ! [ -e "$FILE" ]
-do
-	import -window root "$FILE"
-	if [ $(stat -c %s "$FILE") -lt 65536 ]
-	then
-		echo "Failed! Retrying"
-		rm "$FILE"
-	fi
-	TRIES=$(( $TRIES + 1 ))
-done
 
-if [ $TRIES -ge 10 ]
-then
-	echo "Failed! Giving up"
-	exit 1
-else
-	echo "Succeeded"
-fi
+mkdir -p "$DIR" && ln -nfs "$DIR" "$SCREENSHOT_DIR/latest"
+
+ffmpeg -f x11grab -i :0.0 -vframes 1 -update 1 "$FILE"
 
 # mpv /usr/share/sounds/pop.wav
