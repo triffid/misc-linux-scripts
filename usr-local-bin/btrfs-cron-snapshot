@@ -29,7 +29,7 @@ done
 
 EXPIRE_SECONDS=$(( $NOW - $(( $RETAIN_DAYS * 86400 )) ))
 
-for F in $SNAPSHOT_HOME/*
+for F in $SNAPSHOT_HOME/*-+([0-9])
 do
 	if [ $(( $(date -d "$(btrfs subvolume show $F | grep Creation | cut -d: -f2-)" +%s) )) -le $EXPIRE_SECONDS ]
 	then
