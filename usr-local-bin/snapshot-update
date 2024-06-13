@@ -1,25 +1,33 @@
-#!/bin/bash -x
+#!/bin/bash
+
+NORMAL=$'\e[0m'
+BOLD=$'\e[1m'
 
 SNAPSHOT_DIR="/snapshots/emerge"
 
-btrfs subvolume show "$SNAPSHOT_DIR" || btrfs subvolume snapshot / "$SNAPSHOT_DIR" || exit 1;
+btrfs subvolume show "$SNAPSHOT_DIR" &>/dev/null || btrfs subvolume snapshot / "$SNAPSHOT_DIR" || exit 1;
 
-mountpoint "$SNAPSHOT_DIR/dev" || mount --rbind --make-rslave /dev "$SNAPSHOT_DIR/dev" || exit 1;
-mountpoint "$SNAPSHOT_DIR/sys" || mount --rbind --make-rslave /sys "$SNAPSHOT_DIR/sys" || exit 1;
-mountpoint "$SNAPSHOT_DIR/proc" || mount --rbind --make-rslave /proc "$SNAPSHOT_DIR/proc" || exit 1;
-mountpoint "$SNAPSHOT_DIR/mnt/storage" || mount --rbind --make-rslave /mnt/storage "$SNAPSHOT_DIR/mnt/storage" || exit 1;
+mountpoint -q "$SNAPSHOT_DIR/dev" || mount --rbind --make-rslave /dev "$SNAPSHOT_DIR/dev" || exit 1;
+mountpoint -q "$SNAPSHOT_DIR/sys" || mount --rbind --make-rslave /sys "$SNAPSHOT_DIR/sys" || exit 1;
+mountpoint -q "$SNAPSHOT_DIR/proc" || mount --rbind --make-rslave /proc "$SNAPSHOT_DIR/proc" || exit 1;
+mountpoint -q "$SNAPSHOT_DIR/mnt/storage" || mount --rbind --make-rslave /mnt/storage "$SNAPSHOT_DIR/mnt/storage" || exit 1;
+
+# mount --rbind --make-rslave /etc "$SNAPSHOT_DIR/etc" || exit 1;
+mount --rbind --make-rslave /usr/local/portage "$SNAPSHOT_DIR/usr/local/portage" || exit 1;
 
 [ -h "$SNAPSHOT_DIR/var/cache/packages" ] && ( rm "$SNAPSHOT_DIR/var/cache/packages" && mkdir "$SNAPSHOT_DIR/var/cache/packages"; )
 
-echo 'EMERGE_DEFAULT_OPTS="${EMERGE_DEFAULT_OPTS} --buildpkg"' >> "$SNAPSHOT_DIR/etc/portage/make.conf"
+echo
+echo "Now run emerge -avtDUub @world"
+echo
 
 CHROOT=1 chroot "$SNAPSHOT_DIR" /bin/bash
 
 if ! lsof -n "$SNAPSHOT_DIR"
 then
-    umount -R "$SNAPSHOT_DIR/"{dev,sys,proc,mnt/storage} || exit 1
+    umount -R "$SNAPSHOT_DIR/"{dev,sys,proc,mnt/storage,etc} || exit 1
 fi
 
 echo
-echo "Now run PKGDIR=$SNAPSHOT_DIR/var/cache/packages emerge -avtDUuk @world"
+echo "Now run ${BOLD}PKGDIR=$SNAPSHOT_DIR/var/cache/packages emerge -avtDUuk @world && mv /snapshots/emerge/var/log/emerge.log /var/log/emerge.log && btrfs subvolume delete $SNAPSHOT_DIR && emerge -avc && eclean-dist${NORMAL}"
 echo
