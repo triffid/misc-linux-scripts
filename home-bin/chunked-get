@@ -40,10 +40,10 @@ function getonce() {
 	curl -LsS \
 		${USER:+-u "$USER:$PASS"} \
 		${COOKIEJAR:+-b "$COOKIEJAR"} \
-		-o "$CHUNKFN" \
-		--range $(($N * $CHUNKSIZE))-$((($N * $CHUNKSIZE) + $THISCHUNKSIZE - 1)) \
+		--range $((($N * $CHUNKSIZE) + $(cursize "$CHUNKFN")))-$((($N * $CHUNKSIZE) + $THISCHUNKSIZE - 1)) \
 		-Y 10000 -y 10 \
-		"$URL"
+		"$URL" \
+		>> "$CHUNKFN"
 }
 
 function get() {
@@ -64,8 +64,9 @@ function get() {
 		do
 			if [ -e "$CHUNKFN" ]
 			then
-				echo "Re-downloading chunk $CHUNKFN [$I of $COUNT] (because curl can't handle -C and -r together)"
-				rm "$CHUNKFN"
+				echo "Resuming $CHUNKFN [$I of $COUNT]"
+			else
+				echo "Retrying $CHUNKFN [$I of $COUNT]"
 			fi
 
 			sleep $DELAY
@@ -217,9 +218,11 @@ do
 			fi
 			if [ $(cursize "$CHUNKFN") -lt $THISCHUNKSIZE ]
 			then
-				echo "Starting $CHUNKFN"
+				echo "Starting $CHUNKFN [$I of $COUNT]"
 				get "$I"
 				sleep $DELAY
+			else
+				echo "$CHUNKFN [$I of $COUNT] already complete, skipping"
 			fi
 
 			while [ $(jobs -p | wc -l) -ge $JOBS ]
