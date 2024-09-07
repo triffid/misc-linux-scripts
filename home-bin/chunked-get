@@ -58,6 +58,7 @@ function get() {
 	fi
 
 	(
+		local STARTTIME="$(date +%s.%N)"
 		getonce
 
 		while [ $(cursize "$CHUNKFN") -lt $THISCHUNKSIZE ]
@@ -74,7 +75,21 @@ function get() {
 			getonce
 		done
 
-		echo "$CHUNKFN [$I of $COUNT] complete"
+		local ENDTIME="$(date +%s.%N)"
+		local ELAPSED="$(bc <<< "$ENDTIME - $STARTTIME")"
+		local RATE="$(bc <<< "$THISCHUNKSIZE / $ELAPSED")"
+		if [[ $RATE -ge $(( 2 ** 30 )) ]]
+		then
+			RATE="$(bc <<< "scale=2; $RATE / 2^30")G"
+		elif [[ $RATE -ge $(( 2 ** 20 )) ]]
+		then
+			RATE="$(bc <<< "scale=2; $RATE / 2^20")M"
+		elif [[ $RATE -ge $(( 2 ** 10 )) ]]
+		then
+			RATE="$(bc <<< "scale=2; $RATE / 2^10")k"
+		fi;
+
+		echo "$CHUNKFN [$I of $COUNT] complete in $(printf "%.2f" $ELAPSED)s at ${RATE}B/s"
 	) &
 }
 
