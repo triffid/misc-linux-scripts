@@ -10,6 +10,8 @@ RED=$'\e[31m'
 BOLD=$'\e[1m'
 GREEN=$'\e[32m'
 RESETCOLOUR=$'\e[0m'
+NORMAL=$'\e[0m'
+TAB=$'\t'
 
 function usage {
 	echo "Usage: ${0##*/} [-c chunksize] [-j concurrent downloads] [-o outfile] [-u username] [-C cookiejar] [-d delay] [--sha1sum checksum] [--sha256sum checksum] [--md5sum checksum] url [[options] url] …"
@@ -57,17 +59,25 @@ function get() {
 		THISCHUNKSIZE=$(($SIZE - ($CHUNKSIZE * $N)))
 	fi
 
+	totalrate
 	(
-		local STARTTIME="$(date +%s.%N)"
+		if [ -e "$CHUNKFN" ]
+		then
+			echo "${BOLD}Resuming${NORMAL} $CHUNKFN [$I of $COUNT]"
+		else
+			echo "${BOLD}Starting${NORMAL} $CHUNKFN [$I of $COUNT]"
+		fi
+
 		getonce
 
 		while [ $(cursize "$CHUNKFN") -lt $THISCHUNKSIZE ]
 		do
+			totalrate
 			if [ -e "$CHUNKFN" ]
 			then
-				echo "Resuming $CHUNKFN [$I of $COUNT]"
+				echo "${BOLD}Resuming${NORMAL} $CHUNKFN [$I of $COUNT]${TAB}${TR_TEX}"
 			else
-				echo "Retrying $CHUNKFN [$I of $COUNT]"
+				echo "${BOLD}Retrying${NORMAL} $CHUNKFN [$I of $COUNT]${TAB}${TR_TEX}"
 			fi
 
 			sleep $DELAY
@@ -75,22 +85,39 @@ function get() {
 			getonce
 		done
 
-		local ENDTIME="$(date +%s.%N)"
-		local ELAPSED="$(bc <<< "$ENDTIME - $STARTTIME")"
-		local RATE="$(bc <<< "$THISCHUNKSIZE / $ELAPSED")"
+		totalrate
+		echo "$CHUNKFN ${BOLD}complete${NORMAL} [$I of $COUNT]${TAB}${TR_TEX}"
+	) &
+}
+
+TR_LASTFN=""
+TR_TOTALSIZE=0
+TR_STARTTIME=0
+TR_TEX=""
+function totalrate() {
+	local NEWTOTALSIZE="$(du -cb --files0-from=<(for NN in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done'); do printf "%s\x00" ".$FNAME.$NN"; done; ) 2>/dev/null | tail -n1 | sed -e 's/\s.*//')"
+	local TIME="$(date +%s.%N)"
+	if [ "$FNAME" == "$TR_LASTFN" ]
+	then
+		local RATE="$(bc <<< "($NEWTOTALSIZE - $TR_TOTALSIZE) / ($TIME - $TR_STARTTIME)")"
 		if [[ $RATE -ge $(( 2 ** 30 )) ]]
 		then
-			RATE="$(bc <<< "scale=2; $RATE / 2^30")G"
+			RATE="$(printf "%6.2fG" "$(bc <<< "scale=2; $RATE / 2^30")")"
 		elif [[ $RATE -ge $(( 2 ** 20 )) ]]
 		then
-			RATE="$(bc <<< "scale=2; $RATE / 2^20")M"
+			RATE="$(printf "%6.2fM" "$(bc <<< "scale=2; $RATE / 2^20")")"
 		elif [[ $RATE -ge $(( 2 ** 10 )) ]]
 		then
-			RATE="$(bc <<< "scale=2; $RATE / 2^10")k"
+			RATE="$(printf "%6.2fk" "$(bc <<< "scale=2; $RATE / 2^10")")"
 		fi;
-
-		echo "$CHUNKFN [$I of $COUNT] complete in $(printf "%.2f" $ELAPSED)s at ${RATE}B/s"
-	) &
+		TR_TEX="${RATE}B/s, $(printf "%5.2f" $(bc <<< "scale=2; $NEWTOTALSIZE * 100 / $SIZE"))% complete"
+		TR_STARTTIME="$TIME"
+		TR_TOTALSIZE="$NEWTOTALSIZE"
+	else
+		TR_LASTFN="$FNAME"
+		TR_TOTALSIZE="$NEWTOTALSIZE"
+		TR_STARTTIME="$TIME"
+	fi
 }
 
 while [ -n "$1" ]
@@ -169,7 +196,6 @@ do
 			read -s PASS
 		fi
 
-		#SIZE=$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$URL" | tee /dev/stderr | grep -i "^Content-Range:" | cut -d/ -f2 | tr -d $'\r')
 		HEADER="$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$URL" | tee /dev/stderr)"
 		SIZE=$(echo "$HEADER" | grep -i "^Content-Range:" | cut -d/ -f2 | tr -d $'\r')
 		
@@ -220,6 +246,11 @@ do
 		fi
 		echo " for $(($COUNT + 1)) total chunks"
 
+		TR_LASTFN=""
+		TR_TOTALSIZE=0
+		TR_STARTTIME=0
+		TR_TEX=""
+
 		for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done')
 		do
 			N=$((10#$I))
@@ -233,7 +264,6 @@ do
 			fi
 			if [ $(cursize "$CHUNKFN") -lt $THISCHUNKSIZE ]
 			then
-				echo "Starting $CHUNKFN [$I of $COUNT]"
 				get "$I"
 				sleep $DELAY
 			else
@@ -283,7 +313,6 @@ do
 		for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done')
 		do
 			echo $'\e[0G\e[1A\e[2K'"Assembling $FNAME... $I/$COUNT"
-			# dd if=".$FNAME.$I" of="$FNAME" bs=${CHUNKSIZE} count=1 seek=$((10#$I)) &>/dev/null
 			dd if=".$FNAME.$I" of="$FNAME" bs=${CHUNKSIZE} count=1 seek=$((10#$I)) &>/dev/null && rm ".$FNAME.$I"
 		done
 		echo "${GREEN}${FNAME} successfully generated.${RESETCOLOUR}"
@@ -323,8 +352,6 @@ do
 				exit 1
 			fi
 		fi
-
-		# rm $(for I in $(bash -c 'for I in {00..'$COUNT'}; do echo $I; done'); do echo ".$FNAME.$I"; done)
 	else
 		rm "$FNAME"
 		exit 1
