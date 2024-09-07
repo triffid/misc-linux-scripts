@@ -11,5 +11,11 @@ FILE="$DIR/screenshot-$DATETIME.png"
 mkdir -p "$DIR" && ln -nfs "$DIR" "$SCREENSHOT_DIR/latest"
 
 ffmpeg -f x11grab -i :0.0 -vframes 1 -update 1 "$FILE"
+RET=$?
 
-# mpv /usr/share/sounds/pop.wav
+if [[ "$RET" -eq 0 ]]
+then
+	mpv /usr/share/sounds/Oxygen-Window-Minimize.ogg
+fi
+
+exit "$RET"
