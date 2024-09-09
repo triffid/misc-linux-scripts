@@ -6,7 +6,7 @@ GAMEDIR="$(readlink "$MODDIR/gamedir")"
 echo "MODDIR=\"$MODDIR\""
 echo "GAMEDIR=\"$GAMEDIR\""
 
-LINKSTYLE="s"
+LINKSTYLE="l"
 
 modlist() {
   [ -z "$GAMEDIR" ] && exit 1
@@ -36,7 +36,7 @@ errormessage() {
   echo
   echo "  -u: Unpack only, don't install"
   echo
-  echo "  -l: hard-link instead of symlink"
+  echo "  -l: symlink instead of hard-link"
   echo
   echo "  Updates can be performed with: ${0##*/} -r <modname fragment> <newversion.zip>"
   echo
@@ -132,7 +132,7 @@ do
       UNPACKONLY=1
       ;;
     "-l")
-      LINKSTYLE="l"
+      LINKSTYLE="s"
       ;;
   esac
   shift
