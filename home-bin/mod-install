@@ -150,30 +150,35 @@ while [ -n "$1" ]
 do
   ZIP="$1"
   DIR="${ZIP%.*}"
-  EXT="${ZIP##*.}"
 
-  [ -e "$DIR" ] && rm -r "$DIR"
-
-  echo "Unpacking $ZIP to $DIR"
-
-  case "$EXT" in
-    "zip")
-      unzip -d "$DIR" "$ZIP" || errormessage "unzip failed!"
-      ;;
-    "7z" | "rar")
-      7z x -o"$DIR" "$ZIP" || errormessage "7z failed!"
-      ;;
-    *)
-      errormessage "Unrecognized extension $EXT on $ZIP, don't know how to unpack this!"
-      ;;
-  esac
-  
-  if [ -n "$UNPACKONLY" ]
+  if [ -e "$DIR" ]
   then
-    echo
-    echo "$ZIP unpacked to $DIR/"
-    echo
-    exit 0
+    echo "Reusing unpacked $DIR/"
+    DIR="$ZIP"
+  else
+    EXT="${ZIP##*.}"
+
+    echo "Unpacking $ZIP to $DIR"
+
+    case "$EXT" in
+      "zip")
+        unzip -d "$DIR" "$ZIP" || errormessage "unzip failed!"
+        ;;
+      "7z" | "rar")
+        7z x -o"$DIR" "$ZIP" || errormessage "7z failed!"
+        ;;
+      *)
+        errormessage "Unrecognized extension $EXT on $ZIP, don't know how to unpack this!"
+        ;;
+    esac
+
+    if [ -n "$UNPACKONLY" ]
+    then
+      echo
+      echo "$ZIP unpacked to $DIR/"
+      echo
+      exit 0
+    fi
   fi
 
   pushd "$DIR" &>/dev/null || errormessage "pushd failed!"
