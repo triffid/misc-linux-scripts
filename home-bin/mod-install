@@ -49,6 +49,10 @@ errormessage() {
     done
   ) | sort;
   echo
+  echo "Available (but not installed) mods:"
+  echo
+  ( modlist; for F in *.zip *.rar *.7z; do echo ${F%.*}; done; ) | sort | uniq -u | sed -e 's/^/\t/'
+  echo
   exit $EXIT
 }
 
