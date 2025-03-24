@@ -7,16 +7,6 @@ import argparse
 from operator import itemgetter
 from math import log10, ceil, floor
 
-def getvo(r1, r2):
-	return r2 / (r1 + r2)
-
-def getbest(es, r1dec, r2dec):
-	r = []
-	for r1 in es:
-		for r2 in es:
-			r.append([r1 * r1dec, r2 * r2dec, getvo(r1 * r1dec, r2 * r2dec)])
-	return r
-
 def siprefix(val):
 	gr = min(max(int(floor(log10(val) / 3)), -10), 10)
 	return "%1.2f%s"%(val / (10 ** (3 * gr)), (gr != 0 and "qryzafpnum_kMGTPEZYRQ"[gr + 10]) or "")
@@ -36,8 +26,8 @@ parser = argparse.ArgumentParser(description='Resistor Divider Search')
 parser.add_argument('Vin', metavar='Vin', type=float, help='Input voltage')
 parser.add_argument('Vout', metavar='Vout', type=float, help='Output voltage')
 
-parser.add_argument('-e', '--series', help='E-series to use', type=int, choices=[3, 6,12,24,48,96,192], default=24)
-parser.add_argument('-r', '--results', help='Results to show', type=int, default=2)
+parser.add_argument('-e', '--series', help='E-series to use', type=int, choices=eseries.keys(), default=24)
+parser.add_argument('-r', '--results', help='Results to show', type=int, default=3)
 parser.add_argument('-c', '--current', help='Max current in divider', type=float, default=1e-4)
 parser.add_argument('-i', '--impedance', help='Maximum thevenin impedance from divider', type=float, default=0)
 
@@ -46,28 +36,49 @@ args = parser.parse_args()
 vin  = args.Vin
 vout = args.Vout
 es   = eseries[args.series] + [eseries[args.series][0] * 10]
-rat  = vout / vin
+
 
 if (vout > vin):
 	print("\nVout (%sv) cannot exceed Vin (%sv)! You need an op-amp or boost converter for that\n" % (siprefix(vout), siprefix(vin)))
 	exit(1)
 
-b = getbest(es, 10 ** ceil(log10(vin) - log10(vout)), 1) + getbest(es, 10 ** floor(log10(vin) - log10(vout)), 1) + getbest(es, 1, 10 ** ceil(log10(1 / (vin - vout))))
+b = []
 
-best = list(map(lambda b: [b[0], b[1], abs((b[2] * vin) - vout)], b))
+for r2 in es:
+	r1ideal = r2 * ((vin / vout) - 1)
+	mul = 10 ** floor(log10(r1ideal) - 2)
+	idxguess = floor((log10(r1ideal) - floor(log10(r1ideal))) * args.series)
+	# print("\t[%s: %s; %d?]" % (siprefix(r2), siprefix(r1ideal), idxguess))
+	for i in range(max(idxguess-1,0),min(idxguess+2,len(es))):
+		# print("\t\t[%d: %s]" % (i, siprefix(es[i] * mul)))
+		if (r1ideal == es[i] * mul):
+			# print("\t\t\t[%d: %s ✅]" % (i, siprefix(es[i] * mul)))
+			r1 = es[i] * mul
+			b += [[r1, r2, vout * (r1 + r2) / r2]]
+			break;
+		elif (i < len(es)-1):
+			if ((es[i] * mul < r1ideal) and (es[i+1] * mul > r1ideal)):
+				# print("\t\t\t[%d: %s - %s]" % (i, siprefix(es[i] * mul), siprefix(es[i+1] * mul)))
+				r1 = es[i] * mul
+				b += [[r1, r2, vout * (r1 + r2) / r2]]
+				r1 = es[i + 1] * mul
+				b += [[r1, r2, vout * (r1 + r2) / r2]]
+				break;
+
+best = list(map(lambda b: [b[0], b[1], abs((b[2] - vin))], b))
 
 best.sort(key=itemgetter(2))
 
 print()
 print("Best results:")
-for i in range(args.results):
+for i in range(min(args.results, len(best))):
 	r1 = best[i][0]
 	r2 = best[i][1]
-	rat = getvo(r1, r2)
+	# rat = getvo(r1, r2)
 	thev = 1 / ((1 / r1) + (1 / r2))
 	#if (thev > args.impedance):
 	if (args.impedance):
-		#print("Altering values by %+gx to achieve desired impedance"%(10 ** floor(log10(args.impedance) - log10(thev))))
+		#print("\t(Altering values by %+gx to achieve desired impedance)"%(10 ** floor(log10(args.impedance) - log10(thev))))
 		r1 *= 10 ** floor(log10(args.impedance) - log10(thev))
 		r2 *= 10 ** floor(log10(args.impedance) - log10(thev))
 		thev = 1 / ((1 / r1) + (1 / r2))
@@ -76,16 +87,16 @@ for i in range(args.results):
 
 	#if (curr > args.current):
 	if (args.current):
-		#print("Altering values by %+gx to achieve desired current"%(10 ** ceil(log10(curr) - log10(args.current))))
+		#print("\t(Altering values by %+gx to achieve desired current)"%(10 ** ceil(log10(curr) - log10(args.current))))
 		r1 *= 10 ** ceil(log10(curr) - log10(args.current))
 		r2 *= 10 ** ceil(log10(curr) - log10(args.current))
 		thev = 1 / ((1 / r1) + (1 / r2))
 		curr = vin / (r1 + r2)
 
 	powr = curr * vin
-	vo = rat * vin
+	vo = vin * r2 / (r1 + r2)
 	erro = (vo - vout) * 100 / vout
-	vi = vout / rat
+	vi = vout * (r1 + r2) / r2
 	erri = (vi - vin) * 100 / vin
-	print("\tR1 = %sΩ\tR2 = %sΩ\n\t\tVin  %sv -> Vout %sv (%sv %+2.1f%%)\n\t\tVout %sv -> Vin  %sv (%sv %+2.1f%%)"%(siprefix(r1), siprefix(r2), siprefix(vin), siprefix(vo), siprefix(vout), erro, siprefix(vout), siprefix(vout / rat), siprefix(vin), erri))
+	print("\tR1 = %sΩ\tR2 = %sΩ\n\t\tVin  %sv -> Vout %sv (%sv %+2.1f%%)\n\t\tVout %sv -> Vin  %sv (%sv %+2.1f%%)"%(siprefix(r1), siprefix(r2), siprefix(vin), siprefix(vo), siprefix(vout), erro, siprefix(vout), siprefix(vi), siprefix(vin), erri))
 	print("\t\tThévenin Impedance: %sΩ\tCurrent: %sA\tPower: %sW"%(siprefix(thev), siprefix(curr), siprefix(powr)))
