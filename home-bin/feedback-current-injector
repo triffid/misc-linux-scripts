@@ -80,7 +80,10 @@ for Rbt in es:
     xVmax   =  ((0    - Vfb) / Ric - Irb) * -Rtc + Vfb;
     VmaxErr = xVmax/Vmax - 1
     xVmin   =  ((Vdac - Vfb) / Ric - Irb) * -Rtc + Vfb
-    VminErr = xVmin/Vmin - 1
+    if (Vmin != 0):
+        VminErr = xVmin/Vmin - 1
+    else:
+        VminErr = 0
     
     results.append([Irb, Rbt, Rt, Rtc, Rtc/Rt-1, Ri, Ric, Ric/Ri-1, xVmax, VmaxErr, xVmin, VminErr, (VmaxErr ** 4) + (VminErr ** 4)])
 
