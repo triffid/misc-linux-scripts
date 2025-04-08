@@ -198,6 +198,12 @@ do
 
 		HEADER="$(curl ${USER:+-u "$USER:$PASS"} ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --range 0-1 -o /dev/null -D - --max-time 10 "$URL" | tee /dev/stderr)"
 		SIZE=$(echo "$HEADER" | grep -i "^Content-Range:" | cut -d/ -f2 | tr -d $'\r')
+		if [ -z "$SIZE" ]
+		then
+			SIZE=$(echo "$HEADER" | grep -i "^Content-Length:" | cut -d: -f2 | tr -d $'\r')
+			echo "Got size $SIZE but server doesn't support content-range so this script cannot work"
+			exit 1
+		fi
 		
 		if grep -qi 'Content-Disposition:' <<< "$HEADER"
 		then
