@@ -1,0 +1,66 @@
+#!/usr/bin/perl
+
+# eagle-brd-stackup - emit board stackup
+#
+# Copyright (C) 2017-2019 Michael Moon
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+use strict;
+
+use XML::Simple;
+use Data::Dumper;
+
+if (@ARGV < 1) {
+	print "Usage: eagle-brd-stackup <file.brd>\n";
+	exit 0;
+}
+
+my @brd_offset;
+
+my $fileprefix = $ARGV[0];
+$fileprefix =~ s/\.brd$//;
+
+my $xml = new XML::Simple;
+my $data = $xml->XMLin($ARGV[0]);
+
+# print Dumper($data->{drawing}->{board}->{designrules}->{param});
+
+print "Minimum Drill: "                    . ($data->{drawing}->{board}->{designrules}->{param}->{msDrill}->{value}) . "\n";
+print "Minimum Copper Width: "             . ($data->{drawing}->{board}->{designrules}->{param}->{msWidth}->{value}) . "\n";
+print "Minimum Copper Clearance: "         . ($data->{drawing}->{board}->{designrules}->{param}->{mdWireWire}->{value}) . "\n";
+print "Copper Clearance from board edge: " . ($data->{drawing}->{board}->{designrules}->{param}->{mdCopperDimension}->{value}) . "\n";
+print "Vias smaller than "           . ($data->{drawing}->{board}->{designrules}->{param}->{mlViaStopLimit}->{value}) . " are tented in gerbers\n";
+
+my $layerSetup = $data->{drawing}->{board}->{designrules}->{param}->{layerSetup}->{value};
+
+my @copperThickness = split /\s+/, $data->{drawing}->{board}->{designrules}->{param}->{mtCopper}->{value};
+my @coreThickness = split /\s+/, $data->{drawing}->{board}->{designrules}->{param}->{mtIsolate}->{value};
+
+print "Stackup:\n";
+
+my $isoindex = 0;
+for my $l ($layerSetup =~ /(\d+|[\+\*])/g) {
+	if ($l =~ /^\d+$/) {
+		print "\tCopper : " . $copperThickness[$l - 1] . "\n";
+	}
+	if ($l =~ /^\+$/) {
+		print "\tPrepreg: " . $coreThickness[$isoindex] . "\n";
+		$isoindex++;
+	}
+	if ($l =~ /^\*$/) {
+		print "\tCore   : " . $coreThickness[$isoindex] . "\n";
+		$isoindex++;
+	}
+}

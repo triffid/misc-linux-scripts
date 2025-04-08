@@ -232,6 +232,8 @@ done
 	echo "Layer count:     $LAYERS"
 	echo "Date:            $(date +'%F %H:%M:%S %z')"
 	echo "Revision:        $REV"
+	echo ""
+	eagle-brd-stackup "${NAMEREV}.brd"
 ) > "${NAMEREV}-Board-Info.txt"
 
 ### 3D preview
@@ -248,10 +250,10 @@ then
 	ROT=90
 fi
 
-echo /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,15,0,$(( $ROT + 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-TOP.png" "${NAMEREV}.scad"
-( /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,15,0,$(( $ROT + 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-TOP.png" "${NAMEREV}.scad" 2>&1 | grep -v '^Trimming cache:'; ) &
-echo /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,195,0,$(( $ROT - 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-BOTTOM.png" "${NAMEREV}.scad"
-( /usr/bin/openscad --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,195,0,$(( $ROT - 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-BOTTOM.png" "${NAMEREV}.scad" 2>&1 | grep -v '^Trimming cache:'; ) &
+echo /usr/bin/openscad --backend manifold --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,15,0,$(( $ROT + 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-TOP.png" "${NAMEREV}.scad"
+( /usr/bin/openscad --backend manifold --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,15,0,$(( $ROT + 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-TOP.png" "${NAMEREV}.scad" 2>&1 | grep -v '^Trimming cache:'; ) &
+echo /usr/bin/openscad --backend manifold --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,195,0,$(( $ROT - 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-BOTTOM.png" "${NAMEREV}.scad"
+( /usr/bin/openscad --backend manifold --imgsize 5120,2880 --camera "${DIMENSION[2]}","${DIMENSION[3]}",0,195,0,$(( $ROT - 15 )),"${DIMENSION[4]}" --autocenter --viewall -o "${NAMEREV}-3D-BOTTOM.png" "${NAMEREV}.scad" 2>&1 | grep -v '^Trimming cache:'; ) &
 
 ( /usr/bin/openscad -o "${NAMEREV}.csg" "${NAMEREV}.scad"; ) &
 

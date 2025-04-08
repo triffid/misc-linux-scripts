@@ -33,6 +33,8 @@ for l in r.findall('./drawing/board/libraries/'):
 resultset = {}
 attrs = []
 
+# exclude ADDRESS column from splitting rows
+
 for e in r.findall('./drawing/board/elements/'):
 	if (e.attrib['library'] not in ('testpad', 'testpoint','TC2030') and e.get('package') not in ('2PT_GND_TIE',)):
 		attr_dict = {}

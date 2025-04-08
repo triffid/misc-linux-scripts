@@ -1,25 +1,47 @@
-#!/usr/bin/python3
-# -*- coding: utf8 -*-
+#!/usr/bin/perl
 
-import sys
-import re
-import math
+# eagle-brd-stackup - emit board stackup
+#
+# Copyright (C) 2017-2019 Michael Moon
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from xml.etree import ElementTree
-from pprint import pprint, pformat
+use strict;
 
-if (len(sys.argv) < 2):
-	print("Usage: %s <filename.brd>"%sys.argv[0])
-	exit()
+use XML::Simple;
+use Data::Dumper;
 
-e = ElementTree.parse(sys.argv[1])
-r = e.getroot()
+if (@ARGV < 1) {
+	print "Usage: eagle-brd-export-layercount <file.brd>\n";
+	exit 0;
+}
 
-layercount = 0
+my @brd_offset;
 
-for l in r.findall('./drawing/layers/layer'):
-	if (int(l.get('number')) <= 16):
-		if (l.get('active') == 'yes'):
-			layercount += 1
+my $fileprefix = $ARGV[0];
+$fileprefix =~ s/\.brd$//;
 
-print(layercount)
+my $xml = new XML::Simple;
+my $data = $xml->XMLin($ARGV[0]);
+
+my $layerSetup = $data->{drawing}->{board}->{designrules}->{param}->{layerSetup}->{value};
+
+my $layercount = 0;
+for my $l ($layerSetup =~ /(\d+|[\+\*])/g) {
+	if ($l =~ /^\d+$/) {
+		$layercount++;
+	}
+}
+
+print "$layercount\n";
