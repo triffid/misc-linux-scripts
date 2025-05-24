@@ -223,11 +223,25 @@ do
 		else
 			if grep -qi 'Location:' <<< "$HEADER"
 			then
-				FN="$(grep -i 'Location:' <<< "$HEADER" | tail -n1 | sed -e 's/\r//g')"
-				FN="${FN##*/}"
+				LOC="$(grep -i 'Location:' <<< "$HEADER" | tail -n1 | sed -e 's/\r//g')"
+				LOC="${LOC##* }"
+				FN="${LOC##*/}"
 				FN="$(urldecode "$FN")"
 				echo
 				echo "Filename changed to '$FN' via redirect"
+				if [[ $LOC =~ .gog.com/ ]]
+				then
+					echo -n "Detected GOG link, fetching hash: "
+					HASHFETCH="$(curl ${COOKIEJAR:+-b "$COOKIEJAR"} -A 'Mozilla/5.0' -LsS --max-time 10 "$LOC".xml | head -n1)"
+					HASH="$(perl -ne '/md5="([0-9a-fA-F]+)/ && print $1;' <<< "$HASHFETCH")"
+					if [ -n "$HASH" ]
+					then
+						MD5SUM="$HASH"
+						echo "${BOLD}$MD5SUM${RESETCOLOUR}"
+					else
+						echo "failed"
+					fi
+				fi
 				echo
 				FNAME="$FN"
 			fi
@@ -330,9 +344,10 @@ do
 			then
 				echo "${GREEN}${BOLD}Checksum OK${RESETCOLOUR}"
 			else
-				echo "Sha1sum failed, expected $SHA1SUM got $CHECK"
+				echo "${RED}${BOLD}Sha1sum failed, expected $SHA1SUM got $CHECK${RESETCOLOUR}"
 				exit 1
 			fi
+			unset SHA1SUM
 		fi
 
 		if [ -n "$SHA256SUM" ]
@@ -342,9 +357,10 @@ do
 			then
 				echo "${GREEN}${BOLD}Checksum OK${RESETCOLOUR}"
 			else
-				echo "Sha256sum failed, expected $SHA256SUM got $CHECK"
+				echo "${RED}${BOLD}Sha256sum failed, expected $SHA256SUM got $CHECK${RESETCOLOUR}"
 				exit 1
 			fi
+			unset SHA256SUM
 		fi
 
 		if [ -n "$MD5SUM" ]
@@ -354,9 +370,10 @@ do
 			then
 				echo "${GREEN}${BOLD}Checksum OK${RESETCOLOUR}"
 			else
-				echo "MD5sum failed, expected $MD5SUM got $CHECK"
+				echo "${RED}${BOLD}MD5sum failed, expected $MD5SUM got $CHECK${RESETCOLOUR}"
 				exit 1
 			fi
+			unset MD5SUM
 		fi
 	else
 		rm "$FNAME"
